@@ -526,6 +526,35 @@ export async function getAlbums(): Promise<Album[]> {
   }
 }
 
+export async function getAlbumById(id: number): Promise<Album | null> {
+  const db = await getDatabase();
+  if (!db) return null;
+
+  try {
+    const row = await db.getFirstAsync<Album>(`
+      SELECT 
+        a.id, 
+        a.name, 
+        a.relative_path, 
+        a.description, 
+        a.media_count,
+        a.created_at,
+        (
+          SELECT m.id 
+          FROM media_items m 
+          WHERE m.album_id = a.id 
+          ORDER BY m.created_at DESC 
+          LIMIT 1
+        ) AS cover_media_id
+      FROM albums a
+      WHERE a.id = ?
+    `, [id]);
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getTags(): Promise<Tag[]> {
   const db = await getDatabase();
   if (!db) return [];

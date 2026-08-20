@@ -34,8 +34,8 @@ export default function AlbumsScreen() {
   const router = useRouter();
   const [currentTab, setCurrentTab] = useState<CollectionTab>('albums');
 
-  const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
   const setSelectedTagId = useSetAtom(selectedTagIdAtom);
+  const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
 
   const {
     ip,
@@ -50,9 +50,8 @@ export default function AlbumsScreen() {
   } = useAppStore();
 
   const handleAlbumPress = (album: Album) => {
-    setSelectedAlbumId(album.id);
-    setSelectedTagId(undefined);
-    router.push('/media');
+    // Navigate directly to dedicated album gallery page with pagination
+    router.push(`/album/${album.id}`);
   };
 
   const handleTagPress = (tag: Tag) => {
