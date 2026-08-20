@@ -1,4 +1,3 @@
-import '@/global.css';
 import { Platform } from 'react-native';
 
 export const Material3Baseline = {
