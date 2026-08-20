@@ -1,65 +1,160 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
-
 import { Platform } from 'react-native';
 
-export const Colors = {
+export const Material3Baseline = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    primary: '#0B57D0',
+    onPrimary: '#FFFFFF',
+    primaryContainer: '#D3E3FD',
+    onPrimaryContainer: '#041E49',
+    inversePrimary: '#A8C7FA',
+    secondary: '#00639B',
+    onSecondary: '#FFFFFF',
+    secondaryContainer: '#C2E7FF',
+    onSecondaryContainer: '#001D35',
+    tertiary: '#006A6A',
+    onTertiary: '#FFFFFF',
+    tertiaryContainer: '#6FF7F7',
+    onTertiaryContainer: '#002020',
+    background: '#F8F9FA',
+    onBackground: '#1F1F1F',
+    surface: '#F8F9FA',
+    onSurface: '#1F1F1F',
+    surfaceVariant: '#E1E3E1',
+    onSurfaceVariant: '#444746',
+    surfaceTint: '#0B57D0',
+    inverseSurface: '#303030',
+    inverseOnSurface: '#F2F2F2',
+    error: '#BA1A1A',
+    onError: '#FFFFFF',
+    errorContainer: '#FFDAD6',
+    onErrorContainer: '#410002',
+    outline: '#747775',
+    outlineVariant: '#C4C7C5',
+    scrim: '#000000',
+    surfaceBright: '#F8F9FA',
+    surfaceDim: '#DADADA',
+    surfaceContainerLowest: '#FFFFFF',
+    surfaceContainerLow: '#F3F4F6',
+    surfaceContainer: '#EDEDEE',
+    surfaceContainerHigh: '#E7E8E9',
+    surfaceContainerHighest: '#E1E2E4',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    primary: '#A8C7FA',
+    onPrimary: '#062E6F',
+    primaryContainer: '#0842A0',
+    onPrimaryContainer: '#D3E3FD',
+    inversePrimary: '#0B57D0',
+    secondary: '#7FCFFF',
+    onSecondary: '#003355',
+    secondaryContainer: '#004A77',
+    onSecondaryContainer: '#C2E7FF',
+    tertiary: '#4CDADA',
+    onTertiary: '#003737',
+    tertiaryContainer: '#004F4F',
+    onTertiaryContainer: '#6FF7F7',
+    background: '#111315',
+    onBackground: '#E2E2E5',
+    surface: '#111315',
+    onSurface: '#E2E2E5',
+    surfaceVariant: '#444746',
+    onSurfaceVariant: '#C4C7C5',
+    surfaceTint: '#A8C7FA',
+    inverseSurface: '#E2E2E5',
+    inverseOnSurface: '#1F1F1F',
+    error: '#FFB4AB',
+    onError: '#690005',
+    errorContainer: '#93000A',
+    onErrorContainer: '#FFDAD6',
+    outline: '#8E918F',
+    outlineVariant: '#444746',
+    scrim: '#000000',
+    surfaceBright: '#37393B',
+    surfaceDim: '#111315',
+    surfaceContainerLowest: '#0C0E10',
+    surfaceContainerLow: '#191C1E',
+    surfaceContainer: '#1E2022',
+    surfaceContainerHigh: '#282A2D',
+    surfaceContainerHighest: '#333538',
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type MaterialColorTheme = typeof Material3Baseline.light;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+export const Elevation = {
+  level0: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+  level1: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
+  level2: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
-});
+  level3: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+} as const;
+
+export const Shapes = {
+  none: 0,
+  extraSmall: 4,
+  small: 8,
+  medium: 12,
+  large: 16,
+  extraLarge: 28,
+  full: 9999,
+} as const;
 
 export const Spacing = {
+  none: 0,
   half: 2,
   one: 4,
   two: 8,
   three: 16,
   four: 24,
   five: 32,
-  six: 64,
+  six: 48,
+  seven: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const Fonts = Platform.select({
+  ios: {
+    sans: 'system-ui',
+    serif: 'ui-serif',
+    rounded: 'ui-rounded',
+    mono: 'ui-monospace',
+  },
+  default: {
+    sans: 'Roboto',
+    serif: 'serif',
+    rounded: 'normal',
+    mono: 'monospace',
+  },
+  web: {
+    sans: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    serif: 'var(--font-serif)',
+    rounded: 'var(--font-rounded)',
+    mono: 'var(--font-mono)',
+  },
+});
+
+export const BottomTabInset = Platform.select({ ios: 50, android: 72 }) ?? 0;
 export const MaxContentWidth = 800;
