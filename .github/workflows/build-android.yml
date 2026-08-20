@@ -1,0 +1,97 @@
+name: Android Release Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Android Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Restore Bun Cache & Install Dependencies
+        run: |
+          bun install --frozen-lockfile
+
+      - name: 🔍 TypeScript Verification
+        run: |
+          bun run typecheck
+
+      - name: 🏗️ Expo Prebuild (Generate Native Android Project)
+        run: |
+          bunx expo prebuild --platform android --no-install --clean
+
+      - name: 🔑 Auto-Generate Release Signing Keystore
+        run: |
+          keytool -genkeypair -v \
+            -storetype PKCS12 \
+            -keystore android/app/release.keystore \
+            -alias dstream \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass dstreampass123 \
+            -keypass dstreampass123 \
+            -dname "CN=DStream, OU=Mobile, O=DStream, L=Unknown, ST=Unknown, C=US"
+
+      - name: 🐘 Setup Gradle with Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: 🔨 Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=release.keystore \
+            -Pandroid.injected.signing.store.password=dstreampass123 \
+            -Pandroid.injected.signing.key.alias=dstream \
+            -Pandroid.injected.signing.key.password=dstreampass123 \
+            --no-daemon \
+            --stacktrace
+
+      - name: 📦 Find and Rename Release APK
+        run: |
+          mkdir -p build-output
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" build-output/d-stream-release.apk
+            echo "APK generated at build-output/d-stream-release.apk"
+          else
+            echo "::error::No APK found in output directory"
+            exit 1
+          fi
+
+      - name: 🚀 Upload Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d-stream-android-release
+          path: build-output/d-stream-release.apk
+          if-no-files-found: error
+          retention-days: 14
