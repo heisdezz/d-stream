@@ -2,6 +2,10 @@ import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashView } from '@/components/splash/splash-view';
@@ -13,6 +17,12 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export default function RootLayout() {
   const { colors, isDark } = useMaterialTheme();
 
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
+  });
+
   useEffect(() => {
     useAppStore.getState().init();
   }, []);
@@ -21,7 +31,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaProvider>
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <SplashView />
+        {fontsLoaded && <SplashView />}
         <Stack
           screenOptions={{
             headerStyle: {
@@ -42,7 +52,7 @@ export default function RootLayout() {
             name="media/[id]"
             options={{
               presentation: 'modal',
-              title: 'Media Details',
+              title: 'Media Inspector',
               headerShown: true,
             }}
           />

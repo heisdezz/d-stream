@@ -13,6 +13,6 @@ export function useLibraryData() {
     isLoading: store.isLoading,
     isRefreshing: store.isRefreshing,
     refreshAll: store.refreshLibrary,
-    loadMore: store.loadMoreMedia,
+    fetchMediaPage: store.fetchMediaPage,
   };
 }

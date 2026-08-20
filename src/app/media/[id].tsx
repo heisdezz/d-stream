@@ -1,30 +1,32 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Pressable,
   Alert,
+  Share,
+  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { useVideoPlayer, VideoView } from 'expo-video';
-
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import { useSetAtom } from 'jotai';
+import { selectedAlbumIdAtom } from '@/store/atoms';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { useSync } from '@/hooks/use-sync';
+import { useAppStore } from '@/store/use-app-store';
 import { getMediaItemById } from '@/services/local-db';
 import { getMediaStreamUrl, getThumbnailUrl } from '@/services/sync-api';
 import { MediaItem, ParsedMediaMetadata } from '@/types/models';
-import { Spacing, Shapes, MaxContentWidth } from '@/constants/theme';
+import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
 import { M3Card } from '@/components/material/m3-card';
-import { M3Button } from '@/components/material/m3-button';
 import { M3Badge } from '@/components/material/m3-badge';
+import { M3Button } from '@/components/material/m3-button';
 import { MaterialIcons } from '@expo/vector-icons';
 
 function formatBytes(bytes: number): string {
@@ -32,69 +34,112 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 function formatDuration(seconds: number | null): string {
   if (!seconds) return 'N/A';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}m ${secs}s`;
-}
-
-// Dedicated Video Component using expo-video
-function StreamVideoPlayer({
-  streamUrl,
-  colors,
-}: {
-  streamUrl: string;
-  colors: any;
-}) {
-  const player = useVideoPlayer(streamUrl, (p) => {
-    p.loop = true;
-    p.play();
-  });
-
-  return (
-    <View style={[styles.playerContainer, { backgroundColor: '#000' }]}>
-      <VideoView
-        player={player}
-        style={styles.videoPlayer}
-        nativeControls
-        fullscreenOptions={{ enable: true }}
-        allowsPictureInPicture
-        contentFit="contain"
-      />
-    </View>
-  );
+  const hrs = Math.floor(mins / 60);
+  if (hrs > 0) {
+    const remMins = mins % 60;
+    return `${hrs}h ${remMins}m ${secs}s`;
+  }
+  return `${mins}m ${secs}s (${seconds}s)`;
 }
 
 export default function MediaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const { width } = useWindowDimensions();
 
-  const { ip, port, status: syncStatus } = useSync();
+  const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
+  const { ip, port, status: syncStatus } = useAppStore();
+
   const [item, setItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [imageLoaded, setImageLoaded] = useState<boolean>(false);
-  const [imageError, setImageError] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'exif' | 'tags'>('details');
+
+  const itemId = id ? parseInt(id, 10) : NaN;
 
   useEffect(() => {
     async function loadItem() {
-      if (!id) return;
-      const media = await getMediaItemById(parseInt(id, 10));
-      setItem(media);
+      if (isNaN(itemId)) return;
+      setLoading(true);
+      const res = await getMediaItemById(itemId);
+      setItem(res);
       setLoading(false);
     }
     loadItem();
-  }, [id]);
+  }, [itemId]);
+
+  const isVideo = item?.mime_type.startsWith('video/') ?? false;
+  const streamUrl = useMemo(() => {
+    if (!item) return '';
+    return getMediaStreamUrl(ip, port, item.id);
+  }, [ip, port, item]);
+
+  const thumbnailUrl = useMemo(() => {
+    if (!item) return '';
+    return getThumbnailUrl(ip, port, item.id);
+  }, [ip, port, item]);
+
+  const player = useVideoPlayer(isVideo && streamUrl ? streamUrl : null, (p) => {
+    p.loop = false;
+  });
+
+  const parsedMetadata: ParsedMediaMetadata = useMemo(() => {
+    if (!item?.metadata_json) return {};
+    try {
+      return JSON.parse(item.metadata_json);
+    } catch {
+      return {};
+    }
+  }, [item?.metadata_json]);
+
+  const handleOpenExternal = async () => {
+    if (!streamUrl) return;
+    try {
+      const supported = await Linking.canOpenURL(streamUrl);
+      if (supported) {
+        await Linking.openURL(streamUrl);
+      } else {
+        await WebBrowser.openBrowserAsync(streamUrl);
+      }
+    } catch {
+      await WebBrowser.openBrowserAsync(streamUrl);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (!streamUrl) return;
+    try {
+      await Share.share({
+        message: `Watch/Stream ${item?.current_relative_path}: ${streamUrl}`,
+        url: streamUrl,
+      });
+    } catch {
+      // Ignored
+    }
+  };
+
+  const handleJumpToAlbum = () => {
+    if (item?.album_id) {
+      setSelectedAlbumId(item.album_id);
+      router.dismiss();
+      router.push('/media');
+    }
+  };
 
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
+          Loading media details...
+        </Text>
       </View>
     );
   }
@@ -102,285 +147,289 @@ export default function MediaDetailScreen() {
   if (!item) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <MaterialIcons name="error-outline" size={48} color={colors.outline} />
-        <Text style={[styles.notFoundTitle, { color: colors.onSurface }]}>
+        <MaterialIcons name="error-outline" size={48} color={colors.error} />
+        <Text style={[styles.errorTitle, { color: colors.onSurface }]}>
           Media item not found
         </Text>
       </View>
     );
   }
 
-  const isVideo = item.mime_type.startsWith('video/');
   const fileName = item.current_relative_path.split('/').pop() || 'media';
-  const isOnline = syncStatus === 'connected';
-  const streamUrl = isOnline ? getMediaStreamUrl(ip, port, item.id) : null;
-  const thumbnailUrl = isOnline ? getThumbnailUrl(ip, port, item.id) : null;
-
-  let parsedMetadata: ParsedMediaMetadata | null = null;
-  if (item.metadata_json) {
-    try {
-      parsedMetadata = JSON.parse(item.metadata_json);
-    } catch {
-      // Ignored
-    }
-  }
-
-  const handleOpenExternal = async () => {
-    if (!streamUrl) {
-      Alert.alert(
-        'Server Offline',
-        'Connect to your desktop organizer server in the Sync tab to stream original files.'
-      );
-      return;
-    }
-    try {
-      if (isVideo && Platform.OS === 'android') {
-        const canOpen = await Linking.canOpenURL(streamUrl);
-        if (canOpen) {
-          await Linking.openURL(streamUrl);
-          return;
-        }
-      }
-      await WebBrowser.openBrowserAsync(streamUrl);
-    } catch (err: any) {
-      Alert.alert('Unable to open player', err.message || 'Error opening media link.');
-    }
-  };
-
-  const handleCopyLink = () => {
-    if (!streamUrl) {
-      Alert.alert('Offline', 'Server is not currently connected.');
-      return;
-    }
-    Alert.alert('Stream URL', streamUrl);
-  };
+  const playerHeight = Math.min(320, width * 0.65);
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.contentContainer,
-        { paddingBottom: insets.bottom + Spacing.six },
+        { paddingBottom: insets.bottom + Spacing.seven },
       ]}
     >
-      {/* Visual / Stream Player Card */}
-      <M3Card variant="elevated" style={styles.heroCard}>
+      {/* Hero Media Player / Viewer */}
+      <View style={[styles.mediaViewerContainer, { height: playerHeight, backgroundColor: '#000' }]}>
         {isVideo ? (
-          streamUrl ? (
-            <StreamVideoPlayer streamUrl={streamUrl} colors={colors} />
-          ) : (
-            <View
-              style={[
-                styles.heroVisual,
-                { backgroundColor: colors.tertiaryContainer + '60' },
-              ]}
-            >
-              <MaterialIcons name="videocam" size={64} color={colors.tertiary} />
-              <Text style={[styles.offlineHint, { color: colors.onTertiaryContainer }]}>
-                Connect server to stream 1080p/4K video
-              </Text>
-            </View>
-          )
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            nativeControls
+            fullscreenOptions={{ enable: true }}
+            allowsPictureInPicture
+            contentFit="contain"
+          />
         ) : (
-          /* Full Image Viewer */
-          <View
-            style={[
-              styles.imageContainer,
-              { backgroundColor: colors.surfaceContainerHighest },
-            ]}
-          >
-            {streamUrl && !imageError ? (
-              <Image
-                source={{ uri: streamUrl }}
-                style={styles.fullImage}
-                contentFit="contain"
-                transition={300}
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
-              />
-            ) : thumbnailUrl && !imageError ? (
-              <Image
-                source={{ uri: thumbnailUrl }}
-                style={styles.fullImage}
-                contentFit="contain"
-                transition={200}
-              />
-            ) : (
-              <View style={styles.heroVisual}>
-                <MaterialIcons name="image" size={64} color={colors.primary} />
-              </View>
-            )}
-          </View>
+          <Image
+            source={{ uri: streamUrl || thumbnailUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="contain"
+            transition={300}
+          />
         )}
 
-        {/* Title & Badges */}
-        <View style={styles.heroInfo}>
-          <Text style={[styles.fileName, { color: colors.onSurface }]}>
+        {syncStatus !== 'connected' && (
+          <View style={styles.offlineViewerOverlay}>
+            <MaterialIcons name="wifi-off" size={20} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={styles.offlineOverlayText}>Offline • Server not reachable</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Floating Action Buttons */}
+      <View style={styles.actionsBar}>
+        <M3Button
+          label="Open in External Player"
+          icon="open-in-new"
+          variant="filled"
+          onPress={handleOpenExternal}
+          style={{ flex: 1, marginRight: Spacing.two }}
+        />
+        <M3Button
+          label="Share Link"
+          icon="share"
+          variant="outlined"
+          onPress={handleShareLink}
+        />
+      </View>
+
+      {/* Title & Path Header */}
+      <M3Card variant="elevated" style={styles.titleCard}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.fileName, { color: colors.onSurface }]} numberOfLines={2}>
             {fileName}
           </Text>
-
-          <View style={styles.badgeRow}>
-            <M3Badge
-              label={isVideo ? 'VIDEO STREAM' : 'FULL IMAGE'}
-              variant={isVideo ? 'tertiary' : 'primary'}
-            />
-            {item.album_name && (
-              <M3Badge
-                label={`Album: ${item.album_name}`}
-                variant="secondary"
-                style={{ marginLeft: Spacing.one }}
-              />
-            )}
-            {isOnline && (
-              <M3Badge
-                label="LAN LIVE"
-                variant="tertiary"
-                style={{ marginLeft: Spacing.one }}
-              />
-            )}
-          </View>
-        </View>
-
-        {/* Quick Stream Action Buttons */}
-        <View style={styles.actionRow}>
-          <M3Button
-            label={isVideo ? 'External Video Player' : 'Open in Browser'}
-            icon="open-in-new"
-            variant="filled"
-            onPress={handleOpenExternal}
-            style={{ flex: 1, marginRight: Spacing.two }}
-          />
-          <M3Button
-            label="Stream URL"
-            icon="link"
-            variant="tonal"
-            onPress={handleCopyLink}
+          <M3Badge
+            label={isVideo ? 'VIDEO' : 'IMAGE'}
+            variant={isVideo ? 'primary' : 'secondary'}
+            size="small"
           />
         </View>
+
+        <Text style={[styles.fullPath, { color: colors.onSurfaceVariant }]}>
+          {item.current_relative_path}
+        </Text>
+
+        {item.album_name && (
+          <Pressable onPress={handleJumpToAlbum} style={styles.albumLinkRow}>
+            <MaterialIcons name="folder" size={16} color={colors.primary} />
+            <Text style={[styles.albumLinkText, { color: colors.primary }]}>
+              Album: {item.album_name}
+            </Text>
+            <MaterialIcons name="arrow-forward" size={14} color={colors.primary} />
+          </Pressable>
+        )}
       </M3Card>
 
-      {/* Tags Section */}
-      {item.tags && item.tags.length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
-            TAGS
+      {/* Segmented Specs Tabs */}
+      <View style={styles.tabHeaderRow}>
+        <Pressable
+          onPress={() => setActiveTab('details')}
+          style={[
+            styles.tabBtn,
+            activeTab === 'details' && {
+              backgroundColor: colors.primaryContainer,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabBtnText,
+              {
+                color: activeTab === 'details' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                fontWeight: activeTab === 'details' ? '800' : '600',
+              },
+            ]}
+          >
+            Overview
           </Text>
-          <View style={styles.tagsRow}>
-            {item.tags.map((tag) => (
-              <View
-                key={tag.id}
-                style={[
-                  styles.tagChip,
-                  {
-                    backgroundColor: colors.surfaceContainer,
-                    borderColor: tag.color_hex || colors.outlineVariant,
-                  },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.tagDot,
-                    { backgroundColor: tag.color_hex || colors.primary },
-                  ]}
-                />
-                <Text style={[styles.tagText, { color: colors.onSurface }]}>
-                  {tag.name}
-                </Text>
-              </View>
-            ))}
+        </Pressable>
+
+        <Pressable
+          onPress={() => setActiveTab('exif')}
+          style={[
+            styles.tabBtn,
+            activeTab === 'exif' && {
+              backgroundColor: colors.primaryContainer,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabBtnText,
+              {
+                color: activeTab === 'exif' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                fontWeight: activeTab === 'exif' ? '800' : '600',
+              },
+            ]}
+          >
+            Technical Specs
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setActiveTab('tags')}
+          style={[
+            styles.tabBtn,
+            activeTab === 'tags' && {
+              backgroundColor: colors.primaryContainer,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.tabBtnText,
+              {
+                color: activeTab === 'tags' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                fontWeight: activeTab === 'tags' ? '800' : '600',
+              },
+            ]}
+          >
+            Tags ({item.tags?.length || 0})
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* Tab 1: Overview */}
+      {activeTab === 'details' && (
+        <M3Card variant="filled" style={styles.specsCard}>
+          <View style={styles.specRow}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>File Size</Text>
+            <Text style={[styles.specVal, { color: colors.onSurface }]}>
+              {formatBytes(item.file_size)} ({item.file_size.toLocaleString()} bytes)
+            </Text>
           </View>
-        </View>
+
+          <View style={styles.specRow}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>MIME Type</Text>
+            <Text style={[styles.specVal, { color: colors.onSurface }]}>{item.mime_type}</Text>
+          </View>
+
+          {isVideo && (
+            <View style={styles.specRow}>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Duration</Text>
+              <Text style={[styles.specVal, { color: colors.onSurface }]}>
+                {formatDuration(item.duration_seconds)}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.specRow}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>Indexed Date</Text>
+            <Text style={[styles.specVal, { color: colors.onSurface }]}>
+              {new Date(item.created_at).toLocaleString()}
+            </Text>
+          </View>
+
+          <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>Original Path</Text>
+            <Text style={[styles.specVal, { color: colors.onSurface }]} numberOfLines={2}>
+              {item.original_relative_path}
+            </Text>
+          </View>
+        </M3Card>
       )}
 
-      {/* File Specifications */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
-          FILE SPECIFICATIONS
-        </Text>
-        <M3Card variant="filled">
-          <DetailRow label="File Size" value={formatBytes(item.file_size)} />
-          <DetailRow label="MIME Type" value={item.mime_type} />
-          {isVideo && (
-            <DetailRow
-              label="Duration"
-              value={formatDuration(item.duration_seconds)}
-            />
+      {/* Tab 2: Technical Specs & EXIF */}
+      {activeTab === 'exif' && (
+        <M3Card variant="filled" style={styles.specsCard}>
+          {parsedMetadata.width && parsedMetadata.height ? (
+            <View style={styles.specRow}>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Resolution</Text>
+              <Text style={[styles.specVal, { color: colors.onSurface }]}>
+                {parsedMetadata.width} × {parsedMetadata.height}
+              </Text>
+            </View>
+          ) : null}
+
+          {parsedMetadata.codec ? (
+            <View style={styles.specRow}>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Codec</Text>
+              <Text style={[styles.specVal, { color: colors.onSurface }]}>{parsedMetadata.codec}</Text>
+            </View>
+          ) : null}
+
+          {parsedMetadata.camera_make || parsedMetadata.camera_model ? (
+            <View style={styles.specRow}>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Camera</Text>
+              <Text style={[styles.specVal, { color: colors.onSurface }]}>
+                {[parsedMetadata.camera_make, parsedMetadata.camera_model].filter(Boolean).join(' ')}
+              </Text>
+            </View>
+          ) : null}
+
+          {parsedMetadata.date_taken ? (
+            <View style={styles.specRow}>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Captured At</Text>
+              <Text style={[styles.specVal, { color: colors.onSurface }]}>
+                {parsedMetadata.date_taken}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* SHA-256 Checksum Hash */}
+          <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>SHA-256 Hash</Text>
+            <Text
+              style={[styles.hashVal, { color: colors.primary, backgroundColor: colors.surfaceContainerHigh }]}
+              selectable
+            >
+              {item.file_hash}
+            </Text>
+          </View>
+        </M3Card>
+      )}
+
+      {/* Tab 3: Tags */}
+      {activeTab === 'tags' && (
+        <M3Card variant="filled" style={styles.specsCard}>
+          {item.tags && item.tags.length > 0 ? (
+            <View style={styles.tagsCloud}>
+              {item.tags.map((tag) => (
+                <View
+                  key={tag.id}
+                  style={[
+                    styles.tagBadge,
+                    {
+                      backgroundColor: colors.surfaceContainer,
+                      borderColor: tag.color_hex || colors.primary,
+                    },
+                  ]}
+                >
+                  <View style={[styles.tagDot, { backgroundColor: tag.color_hex || colors.primary }]} />
+                  <Text style={[styles.tagText, { color: colors.onSurface }]}>{tag.name}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.noTagsText, { color: colors.outline }]}>
+              No tags applied to this media item.
+            </Text>
           )}
-          <DetailRow
-            label="Date Created"
-            value={new Date(item.created_at).toLocaleString()}
-          />
-          <DetailRow label="File Hash (SHA-256)" value={item.file_hash} isMonospace />
         </M3Card>
-      </View>
-
-      {/* Storage Paths on Host */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
-          STORAGE LOCATIONS
-        </Text>
-        <M3Card variant="filled">
-          <DetailRow
-            label="Current Relative Path"
-            value={item.current_relative_path}
-          />
-          <DetailRow
-            label="Original Relative Path"
-            value={item.original_relative_path}
-          />
-        </M3Card>
-      </View>
-
-      {/* Metadata & EXIF Inspector */}
-      {parsedMetadata && Object.keys(parsedMetadata).length > 0 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurfaceVariant }]}>
-            METADATA & EXIF INSPECTOR
-          </Text>
-          <M3Card variant="filled">
-            {Object.entries(parsedMetadata).map(([key, val]) => (
-              <DetailRow
-                key={key}
-                label={key.replace(/_/g, ' ').toUpperCase()}
-                value={typeof val === 'object' ? JSON.stringify(val) : String(val)}
-              />
-            ))}
-          </M3Card>
-        </View>
       )}
     </ScrollView>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-  isMonospace = false,
-}: {
-  label: string;
-  value: string;
-  isMonospace?: boolean;
-}) {
-  const { colors } = useMaterialTheme();
-
-  return (
-    <View style={styles.detailRow}>
-      <Text style={[styles.detailLabel, { color: colors.outline }]}>
-        {label}
-      </Text>
-      <Text
-        style={[
-          styles.detailValue,
-          {
-            color: colors.onSurface,
-            fontFamily: isMonospace ? 'monospace' : undefined,
-          },
-        ]}
-        selectable
-      >
-        {value}
-      </Text>
-    </View>
   );
 }
 
@@ -400,110 +449,150 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.four,
   },
-  notFoundTitle: {
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  errorTitle: {
     fontSize: 16,
     fontWeight: '700',
     marginTop: Spacing.two,
   },
-  heroCard: {
-    marginBottom: Spacing.four,
-    padding: 0,
+  mediaViewerContainer: {
+    width: '100%',
+    borderRadius: Shapes.large,
     overflow: 'hidden',
+    marginBottom: Spacing.three,
+    position: 'relative',
+    ...Elevation.level2,
   },
-  playerContainer: {
-    width: '100%',
-    height: 250,
+  offlineViewerOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Shapes.small,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  videoPlayer: {
-    width: '100%',
-    height: '100%',
+  offlineOverlayText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  imageContainer: {
-    width: '100%',
-    height: 280,
+  actionsBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: Spacing.three,
   },
-  fullImage: {
-    width: '100%',
-    height: '100%',
+  titleCard: {
+    marginBottom: Spacing.three,
   },
-  heroVisual: {
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offlineHint: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: Spacing.one,
-  },
-  heroInfo: {
-    padding: Spacing.three,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   fileName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     letterSpacing: -0.3,
+    flex: 1,
+    marginRight: Spacing.two,
   },
-  badgeRow: {
+  fullPath: {
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  albumLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     marginTop: Spacing.two,
+    paddingTop: Spacing.two,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(150,150,150,0.15)',
   },
-  actionRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
-  },
-  section: {
-    marginBottom: Spacing.four,
-  },
-  sectionTitle: {
+  albumLinkText: {
     fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: Spacing.one,
+    fontWeight: '700',
+    marginHorizontal: 4,
   },
-  tagsRow: {
+  tabHeaderRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: Shapes.small,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  tabBtnText: {
+    fontSize: 12,
+  },
+  specsCard: {
+    marginBottom: Spacing.three,
+  },
+  specRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150,150,150,0.12)',
+  },
+  specKey: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  specVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: Spacing.two,
+  },
+  hashVal: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    padding: 4,
+    borderRadius: 4,
+    flex: 1,
+    textAlign: 'right',
+  },
+  tagsCloud: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.one,
+    gap: Spacing.one + 2,
   },
-  tagChip: {
+  tagBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Shapes.medium,
+    paddingVertical: 5,
+    borderRadius: Shapes.large,
     borderWidth: 1,
   },
   tagDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginRight: Spacing.one,
+    marginRight: 6,
   },
   tagText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  detailRow: {
+  noTagsText: {
+    fontSize: 12,
+    textAlign: 'center',
     paddingVertical: Spacing.two,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128,128,128,0.12)',
-  },
-  detailLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 13,
-    lineHeight: 18,
   },
 });

@@ -3,9 +3,8 @@ import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { MediaItem } from '@/types/models';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { Shapes, Spacing } from '@/constants/theme';
+import { Shapes, Spacing, Elevation } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
-import { M3Badge } from '../material/m3-badge';
 import { getThumbnailUrl } from '@/services/sync-api';
 
 export interface MediaListItemProps {
@@ -23,6 +22,20 @@ function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+function getFormatBadge(mime: string, path: string): string {
+  const ext = path.split('.').pop()?.toUpperCase();
+  if (ext && ext.length <= 4) return ext;
+  if (mime.includes('video')) return 'VID';
+  return 'IMG';
+}
+
 export const MediaListItem: React.FC<MediaListItemProps> = ({
   item,
   onPress,
@@ -33,6 +46,7 @@ export const MediaListItem: React.FC<MediaListItemProps> = ({
   const [imageError, setImageError] = useState(false);
   const isVideo = item.mime_type.startsWith('video/');
   const fileName = item.current_relative_path.split('/').pop() || 'media';
+  const formatBadge = getFormatBadge(item.mime_type, item.current_relative_path);
 
   const thumbnailUrl = serverIp ? getThumbnailUrl(serverIp, serverPort, item.id) : null;
 
@@ -40,32 +54,33 @@ export const MediaListItem: React.FC<MediaListItemProps> = ({
     <Pressable
       onPress={() => onPress(item)}
       style={({ pressed }) => [
-        styles.row,
+        styles.card,
         {
           backgroundColor: colors.surfaceContainerLow,
           borderColor: colors.outlineVariant,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
         },
-        pressed && { opacity: Platform.OS === 'ios' ? 0.75 : 0.9 },
       ]}
       android_ripple={{
-        color: colors.primary + '15',
+        color: colors.primary + '18',
         borderless: false,
       }}
     >
+      {/* Thumbnail Box */}
       <View
         style={[
-          styles.iconBox,
+          styles.thumbnailBox,
           {
             backgroundColor: isVideo
-              ? colors.tertiaryContainer
-              : colors.primaryContainer,
+              ? colors.tertiaryContainer + '60'
+              : colors.primaryContainer + '60',
           },
         ]}
       >
         {thumbnailUrl && !imageError ? (
           <Image
             source={{ uri: thumbnailUrl }}
-            style={styles.thumbnailImage}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
             transition={200}
             onError={() => setImageError(true)}
@@ -73,12 +88,21 @@ export const MediaListItem: React.FC<MediaListItemProps> = ({
         ) : (
           <MaterialIcons
             name={isVideo ? 'videocam' : 'image'}
-            size={24}
-            color={isVideo ? colors.onTertiaryContainer : colors.onPrimaryContainer}
+            size={28}
+            color={isVideo ? colors.tertiary : colors.primary}
           />
         )}
+
+        {isVideo && item.duration_seconds ? (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>
+              {formatDuration(item.duration_seconds)}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
+      {/* Details Container */}
       <View style={styles.textContainer}>
         <Text
           style={[styles.fileName, { color: colors.onSurface }]}
@@ -87,90 +111,124 @@ export const MediaListItem: React.FC<MediaListItemProps> = ({
         >
           {fileName}
         </Text>
+
         <Text
-          style={[styles.path, { color: colors.onSurfaceVariant }]}
+          style={[styles.pathText, { color: colors.onSurfaceVariant }]}
           numberOfLines={1}
         >
           {item.current_relative_path}
         </Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.metaText, { color: colors.outline }]}>
+
+        <View style={styles.chipsRow}>
+          <View style={[styles.miniChip, { backgroundColor: colors.surfaceContainerHighest }]}>
+            <Text style={[styles.miniChipText, { color: colors.primary }]}>{formatBadge}</Text>
+          </View>
+
+          <Text style={[styles.sizeText, { color: colors.outline }]}>
             {formatBytes(item.file_size)}
           </Text>
+
           {item.album_name && (
-            <Text style={[styles.albumName, { color: colors.secondary }]}>
-              • {item.album_name}
-            </Text>
+            <View style={[styles.albumChip, { backgroundColor: colors.secondaryContainer }]}>
+              <MaterialIcons name="folder" size={12} color={colors.onSecondaryContainer} style={{ marginRight: 2 }} />
+              <Text style={[styles.albumChipText, { color: colors.onSecondaryContainer }]} numberOfLines={1}>
+                {item.album_name}
+              </Text>
+            </View>
           )}
         </View>
       </View>
 
-      <View style={styles.badgeContainer}>
-        <M3Badge
-          label={isVideo ? 'VIDEO' : 'IMAGE'}
-          variant={isVideo ? 'tertiary' : 'primary'}
-          size="small"
-        />
-        <MaterialIcons
-          name="chevron-right"
-          size={20}
-          color={colors.outline}
-          style={{ marginTop: 4 }}
-        />
-      </View>
+      <MaterialIcons
+        name="chevron-right"
+        size={22}
+        color={colors.outline}
+        style={styles.chevron}
+      />
     </Pressable>
   );
 };
 
 const styles = StyleSheet.create({
-  row: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.two,
-    borderRadius: Shapes.medium,
-    marginBottom: Spacing.one,
+    borderRadius: Shapes.large,
+    marginBottom: Spacing.two,
     borderWidth: 1,
+    ...Elevation.level1,
   },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: Shapes.small,
+  thumbnailBox: {
+    width: 68,
+    height: 68,
+    borderRadius: Shapes.medium,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.two,
     overflow: 'hidden',
+    position: 'relative',
+    marginRight: Spacing.three,
   },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
+  durationBadge: {
+    position: 'absolute',
+    bottom: 3,
+    right: 3,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  durationText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   textContainer: {
     flex: 1,
+    justifyContent: 'center',
   },
   fileName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
-  path: {
+  pathText: {
     fontSize: 11,
-    marginTop: 1,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 2,
   },
-  metaText: {
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  miniChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  miniChipText: {
     fontSize: 10,
+    fontWeight: '800',
+  },
+  sizeText: {
+    fontSize: 11,
     fontWeight: '500',
   },
-  albumName: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginLeft: 4,
+  albumChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: Shapes.full,
+    maxWidth: 120,
   },
-  badgeContainer: {
-    alignItems: 'flex-end',
+  albumChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chevron: {
     marginLeft: Spacing.one,
   },
 });
