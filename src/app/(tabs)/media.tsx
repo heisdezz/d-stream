@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   useWindowDimensions,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAtom } from 'jotai';
+import { LegendList, LegendListRef } from '@legendapp/list/react-native';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import {
@@ -24,7 +24,6 @@ import {
   currentPageAtom,
   pageSizeAtom,
   MediaTypeFilter,
-  ViewLayoutMode,
 } from '@/store/atoms';
 import { Spacing, Shapes, MaxContentWidth } from '@/constants/theme';
 import { M3SearchBar } from '@/components/material/m3-search-bar';
@@ -35,6 +34,7 @@ import { M3Card } from '@/components/material/m3-card';
 import { MediaGridItem } from '@/components/media/media-grid-item';
 import { MediaListItem } from '@/components/media/media-list-item';
 import { PaginationBar } from '@/components/media/pagination-bar';
+import { ScreenLoader, ScreenTransition } from '@/components/common/screen-loader';
 import { MediaItem } from '@/types/models';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -49,7 +49,7 @@ export default function MediaExplorerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const flatListRef = useRef<FlatList>(null);
+  const legendListRef = useRef<LegendListRef>(null);
 
   // Jotai atomic state
   const [query, setQuery] = useAtom(searchQueryAtom);
@@ -104,14 +104,14 @@ export default function MediaExplorerScreen() {
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    legendListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     updatePageSize(newSize);
     setCurrentPage(1);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    legendListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const handleTypeChange = (newType: MediaTypeFilter) => {
@@ -138,6 +138,8 @@ export default function MediaExplorerScreen() {
     layoutMode === 'grid3'
       ? (contentWidth - Spacing.two * 2) / 3
       : (contentWidth - Spacing.two) / 2;
+
+  const estimatedSize = layoutMode === 'list' ? 88 : Math.round(gridItemWidth * 1.1);
 
   const renderItem = ({ item }: { item: MediaItem }) => {
     if (layoutMode === 'list') {
@@ -358,7 +360,13 @@ export default function MediaExplorerScreen() {
             />
           </M3Card>
         </View>
-      ) : mediaItems.length === 0 && !isLoading ? (
+      ) : isLoading && mediaItems.length === 0 ? (
+        <ScreenLoader
+          message={`Loading ${pageSize} media items...`}
+          subMessage="Rendering optimized LegendList virtual grid"
+          icon="perm-media"
+        />
+      ) : mediaItems.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContainer}>
           {renderListHeader()}
           <View style={styles.noResultsBox}>
@@ -372,33 +380,37 @@ export default function MediaExplorerScreen() {
           </View>
         </ScrollView>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          key={`${layoutMode}-${numColumns}`}
-          data={mediaItems}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          numColumns={numColumns}
-          ListHeaderComponent={renderListHeader}
-          ListFooterComponent={renderListFooter}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + Spacing.seven },
-          ]}
-          refreshing={isRefreshing}
-          onRefresh={() => {
-            fetchMediaPage({
-              query,
-              type,
-              albumId: selectedAlbumId,
-              tagId: selectedTagId,
-              sortBy,
-              sortOrder,
-              page: currentPage,
-              pageSize,
-            });
-          }}
-        />
+        <ScreenTransition visible={!isLoading || mediaItems.length > 0}>
+          <LegendList
+            ref={legendListRef}
+            key={`${layoutMode}-${numColumns}`}
+            data={mediaItems}
+            keyExtractor={(item: MediaItem) => item.id.toString()}
+            renderItem={renderItem}
+            numColumns={numColumns}
+            estimatedItemSize={estimatedSize}
+            recycleItems={true}
+            ListHeaderComponent={renderListHeader}
+            ListFooterComponent={renderListFooter}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: insets.bottom + Spacing.seven },
+            ]}
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              fetchMediaPage({
+                query,
+                type,
+                albumId: selectedAlbumId,
+                tagId: selectedTagId,
+                sortBy,
+                sortOrder,
+                page: currentPage,
+                pageSize,
+              });
+            }}
+          />
+        </ScreenTransition>
       )}
     </View>
   );

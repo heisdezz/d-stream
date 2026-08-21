@@ -3,15 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   useWindowDimensions,
   Pressable,
-  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { LegendList, LegendListRef } from '@legendapp/list/react-native';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import { getAlbumById, getMediaItems } from '@/services/local-db';
@@ -24,6 +24,7 @@ import { M3Badge } from '@/components/material/m3-badge';
 import { MediaGridItem } from '@/components/media/media-grid-item';
 import { MediaListItem } from '@/components/media/media-list-item';
 import { PaginationBar } from '@/components/media/pagination-bar';
+import { ScreenLoader, ScreenTransition } from '@/components/common/screen-loader';
 import { MediaItem } from '@/types/models';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -39,7 +40,7 @@ export default function AlbumGalleryScreen() {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const flatListRef = useRef<FlatList>(null);
+  const legendListRef = useRef<LegendListRef>(null);
 
   const albumId = id ? parseInt(id, 10) : NaN;
 
@@ -54,7 +55,7 @@ export default function AlbumGalleryScreen() {
   const [pageSize, setPageSize] = useState(storePageSize || 96);
 
   // 1. Fetch Album Metadata via TanStack Query
-  const { data: album, isLoading: albumLoading } = useQuery({
+  const { data: album } = useQuery({
     queryKey: ['album-meta', albumId],
     queryFn: () => getAlbumById(albumId),
     enabled: !isNaN(albumId),
@@ -86,14 +87,14 @@ export default function AlbumGalleryScreen() {
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    legendListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     updatePageSize(newSize);
     setPage(1);
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    legendListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const toggleLayoutMode = () => {
@@ -113,6 +114,8 @@ export default function AlbumGalleryScreen() {
     layoutMode === 'grid3'
       ? (contentWidth - Spacing.two * 2) / 3
       : (contentWidth - Spacing.two) / 2;
+
+  const estimatedSize = layoutMode === 'list' ? 88 : Math.round(gridItemWidth * 1.1);
 
   const renderItem = ({ item }: { item: MediaItem }) => {
     if (layoutMode === 'list') {
@@ -296,50 +299,45 @@ export default function AlbumGalleryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {mediaLoading && mediaItems.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
-            Loading album media...
-          </Text>
-        </View>
+        <ScreenLoader
+          message={`Loading album items...`}
+          subMessage="Rendering virtualized LegendList"
+          icon="folder-special"
+        />
       ) : mediaItems.length === 0 ? (
-        <FlatList
-          data={[]}
-          renderItem={() => null}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialIcons name="folder-open" size={54} color={colors.outline} />
-              <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                Album is Empty
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-                No media items found matching current filters inside this album.
-              </Text>
-            </View>
-          }
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + Spacing.seven },
-          ]}
-        />
+        <ScrollView contentContainerStyle={styles.emptyContainer}>
+          {renderHeader()}
+          <View style={styles.emptyStateBox}>
+            <MaterialIcons name="folder-open" size={54} color={colors.outline} />
+            <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+              Album is Empty
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
+              No media items found matching current filters inside this album.
+            </Text>
+          </View>
+        </ScrollView>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          key={`${layoutMode}-${numColumns}`}
-          data={mediaItems}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderItem}
-          numColumns={numColumns}
-          ListHeaderComponent={renderHeader}
-          ListFooterComponent={renderFooter}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + Spacing.seven },
-          ]}
-          refreshing={isFetching}
-          onRefresh={refetch}
-        />
+        <ScreenTransition visible={!mediaLoading || mediaItems.length > 0}>
+          <LegendList
+            ref={legendListRef}
+            key={`${layoutMode}-${numColumns}`}
+            data={mediaItems}
+            keyExtractor={(item: MediaItem) => item.id.toString()}
+            renderItem={renderItem}
+            numColumns={numColumns}
+            estimatedItemSize={estimatedSize}
+            recycleItems={true}
+            ListHeaderComponent={renderHeader}
+            ListFooterComponent={renderFooter}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: insets.bottom + Spacing.seven },
+            ]}
+            refreshing={isFetching}
+            onRefresh={refetch}
+          />
+        </ScreenTransition>
       )}
     </View>
   );
@@ -445,18 +443,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
   },
-  loadingContainer: {
+  emptyContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: Spacing.four,
   },
-  loadingText: {
-    marginTop: Spacing.two,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
+  emptyStateBox: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing.six,
