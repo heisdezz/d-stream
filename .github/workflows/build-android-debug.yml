@@ -1,0 +1,100 @@
+name: Android Debug Build (Manual)
+
+# Manually-triggered debug APK for on-device testing.
+# Debug builds are signed with the standard auto-generated debug keystore
+# (no release signing step) and are `debuggable`. NOTE: a debug APK expects a
+# Metro dev server at launch — install it while `bunx expo start` is running on
+# a reachable machine. Use the Release workflow for a standalone APK.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Android Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ⚡ Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: ☕ Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Shares cache keys with the release workflow so this job seeds from the
+      # release build's warm Bun + native caches (and vice-versa).
+      - name: 💾 Cache Bun Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: 💾 Cache Native Build Intermediates
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/app/.cxx
+            android/.gradle
+          key: ${{ runner.os }}-rn-native-${{ hashFiles('bun.lock', 'app.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-rn-native-
+
+      - name: 🏗️ Expo Prebuild (Generate Native Android Project)
+        run: bunx expo prebuild --platform android --no-install
+
+      - name: ⚙️ Enable Gradle Build Cache
+        run: echo "org.gradle.caching=true" >> android/gradle.properties
+
+      - name: 🐘 Setup Gradle with Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
+      - name: 🔨 Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug \
+            --build-cache \
+            --no-daemon \
+            --stacktrace
+
+      - name: 📦 Find and Rename Debug APK
+        run: |
+          mkdir -p build-output
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" build-output/d-stream-debug.apk
+            echo "APK generated at build-output/d-stream-debug.apk"
+          else
+            echo "::error::No APK found in output directory"
+            exit 1
+          fi
+
+      - name: 🚀 Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: d-stream-android-debug
+          path: build-output/d-stream-debug.apk
+          if-no-files-found: error
+          retention-days: 7

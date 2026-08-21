@@ -34,17 +34,46 @@ jobs:
       - name: 🤖 Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: 📦 Restore Bun Cache & Install Dependencies
-        run: |
-          bun install --frozen-lockfile
+      # Cache the resolved Bun store + node_modules so `bun install` is a no-op
+      # when the lockfile is unchanged.
+      - name: 💾 Cache Bun Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: 📦 Install Dependencies
+        run: bun install --frozen-lockfile
 
       - name: 🔍 TypeScript Verification
-        run: |
-          bun run typecheck
+        run: bun run typecheck
 
+      # Cache the native build intermediates (CMake/.cxx + the project Gradle
+      # dir). This is where most of the 20 min goes: recompiling RN, reanimated
+      # and the Expo modules' C++. Keyed on the inputs that change the native
+      # graph, so a JS-only change reuses the compiled objects.
+      - name: 💾 Cache Native Build Intermediates
+        uses: actions/cache@v4
+        with:
+          path: |
+            android/app/.cxx
+            android/.gradle
+          key: ${{ runner.os }}-rn-native-${{ hashFiles('bun.lock', 'app.json', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-rn-native-
+
+      # NOTE: no --clean. --clean deletes android/ (including the restored .cxx),
+      # forcing a full native recompile every run. Prebuild is idempotent, and
+      # the native cache key already busts on app.json/package.json changes.
       - name: 🏗️ Expo Prebuild (Generate Native Android Project)
-        run: |
-          bunx expo prebuild --platform android --no-install --clean
+        run: bunx expo prebuild --platform android --no-install
+
+      - name: ⚙️ Enable Gradle Build Cache
+        run: echo "org.gradle.caching=true" >> android/gradle.properties
 
       - name: 🔑 Auto-Generate Release Signing Keystore
         run: |
@@ -73,6 +102,7 @@ jobs:
             -Pandroid.injected.signing.store.password=dstreampass123 \
             -Pandroid.injected.signing.key.alias=dstream \
             -Pandroid.injected.signing.key.password=dstreampass123 \
+            --build-cache \
             --no-daemon \
             --stacktrace
 
