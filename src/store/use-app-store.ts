@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import {
   Album,
   LibraryStats,
@@ -8,7 +8,7 @@ import {
   SyncProgress,
   SyncStatus,
   Tag,
-} from '@/types/models';
+} from "@/types/models";
 import {
   DEFAULT_SERVER_IP,
   DEFAULT_SERVER_PORT,
@@ -18,12 +18,12 @@ import {
   setLastSyncTime,
   saveServerConfig,
   removeServerFromHistory,
-} from '@/services/storage';
+} from "@/services/storage";
 import {
   testServerConnection,
   fetchServerInfo,
   downloadDatabaseSnapshot,
-} from '@/services/sync-api';
+} from "@/services/sync-api";
 import {
   getNewSnapshotDownloadPath,
   importDownloadedSnapshot,
@@ -34,15 +34,15 @@ import {
   getMediaItems,
   isDatabaseAvailable,
   GetMediaOptions,
-} from '@/services/local-db';
+} from "@/services/local-db";
 
 interface FetchPageOptions {
   query?: string;
-  type?: 'all' | 'image' | 'video';
+  type?: "all" | "image" | "video";
   albumId?: number;
   tagId?: number;
-  sortBy?: 'created_at' | 'file_size' | 'current_relative_path';
-  sortOrder?: 'ASC' | 'DESC';
+  sortBy?: "created_at" | "file_size" | "current_relative_path";
+  sortOrder?: "ASC" | "DESC";
   page?: number;
   pageSize?: number;
 }
@@ -77,7 +77,10 @@ interface AppState {
   setIp: (ip: string) => void;
   setPort: (port: number) => void;
   checkConnection: (targetIp?: string, targetPort?: number) => Promise<void>;
-  syncDatabase: (targetIp?: string, targetPort?: number) => Promise<{ success: boolean; error?: string }>;
+  syncDatabase: (
+    targetIp?: string,
+    targetPort?: number,
+  ) => Promise<{ success: boolean; error?: string }>;
   refreshLibrary: () => Promise<void>;
   fetchMediaPage: (options?: FetchPageOptions) => Promise<void>;
   removeHistoryServer: (delIp: string, delPort: number) => Promise<void>;
@@ -88,7 +91,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   port: DEFAULT_SERVER_PORT,
   serverHistory: [],
   serverInfo: null,
-  status: 'idle',
+  status: "idle",
   errorMessage: null,
   syncProgress: null,
   lastSyncTime: null,
@@ -101,7 +104,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     albums: 0,
     tags: 0,
     db_size_bytes: 0,
-    db_size_formatted: '0 B',
+    db_size_formatted: "0 B",
     db_exists: false,
   },
   hasDatabase: false,
@@ -133,7 +136,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().checkConnection(config.ip, config.port),
       ]);
     } catch (e) {
-      console.warn('[AppStore] Init error:', e);
+      console.warn("[AppStore] Init error:", e);
     }
   },
 
@@ -143,29 +146,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   checkConnection: async (targetIp?: string, targetPort?: number) => {
     const currentIp = targetIp ?? get().ip;
     const currentPort = targetPort ?? get().port;
-
-    set({ status: 'testing', errorMessage: null });
+    // console.log(currentIp, currentPort);
+    set({ status: "testing", errorMessage: null });
 
     const test = await testServerConnection(currentIp, currentPort);
-    set({ latencyMs: test.latencyMs });
 
+    set({ latencyMs: test.latencyMs });
+    console.log(currentIp, currentPort);
     if (test.reachable && test.serverInfo) {
       set({
         serverInfo: test.serverInfo,
-        status: 'connected',
+        status: "connected",
       });
-      await saveServerConfig(currentIp, currentPort, test.serverInfo.drive_name);
+      await saveServerConfig(
+        currentIp,
+        currentPort,
+        test.serverInfo.drive_name,
+      );
       const updatedHistory = await getServerHistory();
       set({ serverHistory: updatedHistory });
     } else {
+      console.log(test.error);
       set({
         serverInfo: test.serverInfo ?? {
-          status: 'offline',
-          server: 'Unreachable',
+          status: "offline",
+          server: "Unreachable",
           error: test.error,
         },
-        status: 'error',
-        errorMessage: test.error ?? 'Server is not reachable',
+        status: "error",
+        errorMessage: test.error ?? "Server is not reachable",
       });
     }
   },
@@ -175,7 +184,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentPort = targetPort ?? get().port;
 
     set({
-      status: 'downloading',
+      status: "downloading",
       errorMessage: null,
       syncProgress: { bytesWritten: 0, contentLength: 0, percentage: 0 },
     });
@@ -188,28 +197,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       downloadPath,
       (progress) => {
         set({ syncProgress: progress });
-      }
+      },
     );
 
     if (!downloadRes.success || !downloadRes.uri) {
       set({
-        status: 'error',
-        errorMessage: downloadRes.error ?? 'Database download failed',
+        status: "error",
+        errorMessage: downloadRes.error ?? "Database download failed",
         syncProgress: null,
       });
       return { success: false, error: downloadRes.error };
     }
 
-    set({ status: 'migrating' });
+    set({ status: "migrating" });
     const importSuccess = await importDownloadedSnapshot(dbName);
 
     if (!importSuccess) {
       set({
-        status: 'error',
-        errorMessage: 'Failed to verify the downloaded SQLite database snapshot.',
+        status: "error",
+        errorMessage:
+          "Failed to verify the downloaded SQLite database snapshot.",
         syncProgress: null,
       });
-      return { success: false, error: 'Database import failed' };
+      return { success: false, error: "Database import failed" };
     }
 
     const nowIso = new Date().toISOString();
@@ -225,10 +235,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedHistory = await getServerHistory();
 
     set({
-      status: 'success',
+      status: "success",
       syncProgress: null,
       lastSyncTime: nowIso,
-      serverInfo: info,
+      // Only overwrite serverInfo if the refetch succeeded; keeps the
+      // previously-connected state visible when the server goes offline
+      // between download and this check.
+      ...(info.status === "online" && { serverInfo: info }),
       serverHistory: updatedHistory,
     });
 
@@ -255,7 +268,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         recentMedia: recentList,
       });
     } catch (e) {
-      console.warn('[AppStore] Error refreshing library:', e);
+      console.warn("[AppStore] Error refreshing library:", e);
     } finally {
       set({ isRefreshing: false, isLoading: false });
     }
@@ -263,12 +276,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   fetchMediaPage: async (options: FetchPageOptions = {}) => {
     const {
-      query = '',
-      type = 'all',
+      query = "",
+      type = "all",
       albumId,
       tagId,
-      sortBy = 'created_at',
-      sortOrder = 'DESC',
+      sortBy = "created_at",
+      sortOrder = "DESC",
       page = 1,
       pageSize = 24,
     } = options;
@@ -295,7 +308,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isLoading: false,
       });
     } catch (e) {
-      console.warn('[AppStore] fetchMediaPage error:', e);
+      console.warn("[AppStore] fetchMediaPage error:", e);
       set({ isLoading: false });
     }
   },

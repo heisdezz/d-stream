@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,31 +7,31 @@ import {
   TextInput,
   Pressable,
   Alert,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { useAppStore } from '@/store/use-app-store';
-import { Spacing, Shapes, MaxContentWidth } from '@/constants/theme';
-import { M3Card } from '@/components/material/m3-card';
-import { M3Button } from '@/components/material/m3-button';
-import { M3Badge } from '@/components/material/m3-badge';
-import { ConnectionStatus } from '@/components/sync/connection-status';
-import { SyncProgressBar } from '@/components/sync/sync-progress-bar';
-import { MaterialIcons } from '@expo/vector-icons';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { useAppStore } from "@/store/use-app-store";
+import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
+import { M3Card } from "@/components/material/m3-card";
+import { M3Button } from "@/components/material/m3-button";
+import { M3Badge } from "@/components/material/m3-badge";
+import { ConnectionStatus } from "@/components/sync/connection-status";
+import { SyncProgressBar } from "@/components/sync/sync-progress-bar";
+import { MaterialIcons } from "@expo/vector-icons";
 
 function formatRelativeTime(iso?: string): string {
-  if (!iso) return '';
+  if (!iso) return "";
   try {
     const diffMs = Date.now() - new Date(iso).getTime();
     const mins = Math.floor(diffMs / 60000);
-    if (mins < 2) return 'Just now';
+    if (mins < 2) return "Just now";
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     return `${days}d ago`;
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -80,15 +80,18 @@ export default function SyncScreen() {
     const res = await syncDatabase(inputIp.trim(), p);
     if (res.success) {
       Alert.alert(
-        'Sync Complete',
-        'Local SQLite database successfully updated with fresh media library snapshot!'
+        "Sync Complete",
+        "Local SQLite database successfully updated with fresh media library snapshot!",
       );
     } else {
-      Alert.alert('Sync Failed', res.error || 'Could not download database.');
+      Alert.alert("Sync Failed", res.error || "Could not download database.");
     }
   };
 
-  const handleSelectHistoryServer = async (histIp: string, histPort: number) => {
+  const handleSelectHistoryServer = async (
+    histIp: string,
+    histPort: number,
+  ) => {
     setInputIp(histIp);
     setInputPort(histPort.toString());
     setIp(histIp);
@@ -100,25 +103,25 @@ export default function SyncScreen() {
     await removeHistoryServer(delIp, delPort);
   };
 
-  const faqs = [
-    {
-      q: 'How do I start the sync server on Linux?',
-      a: 'Open the External Drive Media Organizer desktop app, navigate to Settings in the sidebar, scroll to "Local Network Mobile Sync", and toggle the switch to ON.',
-    },
-    {
-      q: 'Cannot connect from mobile device?',
-      a: 'Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp',
-    },
-    {
-      q: 'How does live media streaming work?',
-      a: 'The mobile app connects to http://<IP>:8080/media/<id> to stream full-res video with HTTP 206 Range seeking support and http://<IP>:8080/thumbnail/<id> for fast JPEG thumbnails.',
-    },
-    {
-      q: 'How does database snapshot sync work?',
-      a: 'The server creates an exFAT-safe SQLite VACUUM INTO snapshot and streams .media_library.db over LAN. The mobile app saves it locally, allowing complete offline search and inspection.',
-    },
-  ];
-
+  // const faqs = [
+  //   {
+  //     q: 'How do I start the sync server on Linux?',
+  //     a: 'Open the External Drive Media Organizer desktop app, navigate to Settings in the sidebar, scroll to "Local Network Mobile Sync", and toggle the switch to ON.',
+  //   },
+  //   {
+  //     q: 'Cannot connect from mobile device?',
+  //     a: 'Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp',
+  //   },
+  //   {
+  //     q: 'How does live media streaming work?',
+  //     a: 'The mobile app connects to http://<IP>:8080/media/<id> to stream full-res video with HTTP 206 Range seeking support and http://<IP>:8080/thumbnail/<id> for fast JPEG thumbnails.',
+  //   },
+  //   {
+  //     q: 'How does database snapshot sync work?',
+  //     a: 'The server creates an exFAT-safe SQLite VACUUM INTO snapshot and streams .media_library.db over LAN. The mobile app saves it locally, allowing complete offline search and inspection.',
+  //   },
+  // ];
+  const faqs: { q: string; a: string }[] = [];
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -143,7 +146,11 @@ export default function SyncScreen() {
           variant="filled"
           style={[styles.errorCard, { backgroundColor: colors.errorContainer }]}
         >
-          <MaterialIcons name="error-outline" size={22} color={colors.onErrorContainer} />
+          <MaterialIcons
+            name="error-outline"
+            size={22}
+            color={colors.onErrorContainer}
+          />
           <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>
             {errorMessage}
           </Text>
@@ -170,7 +177,9 @@ export default function SyncScreen() {
           </View>
 
           {serverHistory.map((srv, idx) => {
-            const isCurrent = srv.ip === inputIp && srv.port === (parseInt(inputPort, 10) || 8080);
+            const isCurrent =
+              srv.ip === inputIp &&
+              srv.port === (parseInt(inputPort, 10) || 8080);
             return (
               <Pressable
                 key={`${srv.ip}-${srv.port}-${idx}`}
@@ -199,9 +208,11 @@ export default function SyncScreen() {
                   ]}
                 >
                   <MaterialIcons
-                    name={isCurrent ? 'check-circle' : 'router'}
+                    name={isCurrent ? "check-circle" : "router"}
                     size={20}
-                    color={isCurrent ? colors.onSecondary : colors.onSurfaceVariant}
+                    color={
+                      isCurrent ? colors.onSecondary : colors.onSurfaceVariant
+                    }
                   />
                 </View>
 
@@ -214,7 +225,7 @@ export default function SyncScreen() {
                           color: isCurrent
                             ? colors.onSecondaryContainer
                             : colors.onSurface,
-                          fontWeight: isCurrent ? '800' : '600',
+                          fontWeight: isCurrent ? "800" : "600",
                         },
                       ]}
                     >
@@ -232,11 +243,15 @@ export default function SyncScreen() {
 
                   <View style={styles.historyBottomRow}>
                     {srv.driveName ? (
-                      <Text style={[styles.driveLabel, { color: colors.primary }]}>
+                      <Text
+                        style={[styles.driveLabel, { color: colors.primary }]}
+                      >
                         Drive: {srv.driveName}
                       </Text>
                     ) : (
-                      <Text style={[styles.driveLabel, { color: colors.outline }]}>
+                      <Text
+                        style={[styles.driveLabel, { color: colors.outline }]}
+                      >
                         External Media Organizer
                       </Text>
                     )}
@@ -256,7 +271,11 @@ export default function SyncScreen() {
                   hitSlop={12}
                   style={styles.deleteBtn}
                 >
-                  <MaterialIcons name="close" size={18} color={colors.outline} />
+                  <MaterialIcons
+                    name="close"
+                    size={18}
+                    color={colors.outline}
+                  />
                 </Pressable>
               </Pressable>
             );
@@ -297,7 +316,12 @@ export default function SyncScreen() {
           />
         </View>
 
-        <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant, marginTop: Spacing.two }]}>
+        <Text
+          style={[
+            styles.inputLabel,
+            { color: colors.onSurfaceVariant, marginTop: Spacing.two },
+          ]}
+        >
           Server Port
         </Text>
         <View
@@ -325,15 +349,15 @@ export default function SyncScreen() {
             label="Test Connection"
             icon="wifi"
             variant="outlined"
-            loading={status === 'testing'}
+            loading={status === "testing"}
             onPress={handleApplyAndTest}
             style={{ flex: 1, marginRight: Spacing.two }}
           />
           <M3Button
-            label={status === 'downloading' ? 'Downloading...' : 'Download DB'}
+            label={status === "downloading" ? "Downloading..." : "Download DB"}
             icon="cloud-download"
             variant="filled"
-            loading={status === 'downloading' || status === 'migrating'}
+            loading={status === "downloading" || status === "migrating"}
             onPress={handleSyncPress}
             style={{ flex: 1 }}
           />
@@ -348,30 +372,44 @@ export default function SyncScreen() {
             Local Database State
           </Text>
           <M3Badge
-            label={stats.total_items > 0 ? 'ACTIVE' : 'EMPTY'}
-            variant={stats.total_items > 0 ? 'primary' : 'surface'}
+            label={stats.total_items > 0 ? "ACTIVE" : "EMPTY"}
+            variant={stats.total_items > 0 ? "primary" : "surface"}
             size="small"
-            style={{ marginLeft: 'auto' }}
+            style={{ marginLeft: "auto" }}
           />
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>Total Media</Text>
-            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>{stats.total_items}</Text>
+            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>
+              Total Media
+            </Text>
+            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>
+              {stats.total_items}
+            </Text>
           </View>
           <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>Albums</Text>
-            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>{stats.albums}</Text>
+            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>
+              Albums
+            </Text>
+            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>
+              {stats.albums}
+            </Text>
           </View>
           <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>DB Size</Text>
-            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>{stats.db_size_formatted}</Text>
+            <Text style={[styles.dbStatLabel, { color: colors.outline }]}>
+              DB Size
+            </Text>
+            <Text style={[styles.dbStatVal, { color: colors.onSurface }]}>
+              {stats.db_size_formatted}
+            </Text>
           </View>
         </View>
 
         {lastSyncTime && (
-          <Text style={[styles.lastSyncLabel, { color: colors.onSurfaceVariant }]}>
+          <Text
+            style={[styles.lastSyncLabel, { color: colors.onSurfaceVariant }]}
+          >
             Last Synced: {new Date(lastSyncTime).toLocaleString()}
           </Text>
         )}
@@ -379,7 +417,9 @@ export default function SyncScreen() {
 
       {/* Troubleshooting FAQs */}
       <View style={styles.faqSection}>
-        <Text style={[styles.sectionHeader, { color: colors.onSurfaceVariant }]}>
+        <Text
+          style={[styles.sectionHeader, { color: colors.onSurfaceVariant }]}
+        >
           TROUBLESHOOTING & HELP
         </Text>
         {faqs.map((faq, index) => {
@@ -397,13 +437,15 @@ export default function SyncScreen() {
                   {faq.q}
                 </Text>
                 <MaterialIcons
-                  name={isExpanded ? 'expand-less' : 'expand-more'}
+                  name={isExpanded ? "expand-less" : "expand-more"}
                   size={22}
                   color={colors.onSurfaceVariant}
                 />
               </View>
               {isExpanded && (
-                <Text style={[styles.faqAnswer, { color: colors.onSurfaceVariant }]}>
+                <Text
+                  style={[styles.faqAnswer, { color: colors.onSurfaceVariant }]}
+                >
                   {faq.a}
                 </Text>
               )}
@@ -422,19 +464,19 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: Spacing.four,
     maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
+    alignSelf: "center",
+    width: "100%",
   },
   errorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: Spacing.three,
     borderRadius: Shapes.medium,
     marginBottom: Spacing.three,
   },
   errorText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: Spacing.two,
     flex: 1,
   },
@@ -442,23 +484,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
   },
   sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: Spacing.one,
   },
   sectionHeader: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: 0.8,
   },
   quickHint: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   historyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: Spacing.two,
     borderRadius: Shapes.medium,
     borderWidth: 1,
@@ -468,28 +510,28 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: Shapes.small,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.two,
   },
   historyContent: {
     flex: 1,
   },
   historyTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   historyIp: {
     fontSize: 14,
   },
   historyBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
   },
   driveLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   timeAgo: {
     fontSize: 11,
@@ -503,18 +545,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
   },
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.three,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     marginLeft: Spacing.one,
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: Spacing.one,
   },
   inputBox: {
@@ -522,53 +564,53 @@ const styles = StyleSheet.create({
     borderRadius: Shapes.small,
     borderWidth: 1,
     paddingHorizontal: Spacing.two,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   input: {
     fontSize: 15,
-    height: '100%',
+    height: "100%",
   },
   buttonRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginTop: Spacing.four,
   },
   dbInfoCard: {
     marginBottom: Spacing.three,
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: Spacing.one,
     marginBottom: Spacing.two,
   },
   dbStatCol: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   dbStatLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   dbStatVal: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     marginTop: 2,
   },
   lastSyncLabel: {
     fontSize: 11,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: Spacing.one,
   },
   faqSection: {
     marginTop: Spacing.two,
   },
   faqHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   faqQuestion: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     flex: 1,
     marginRight: Spacing.two,
   },
