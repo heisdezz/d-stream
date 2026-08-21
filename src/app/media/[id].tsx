@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Share,
   useWindowDimensions,
   Platform,
@@ -27,6 +26,7 @@ import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
 import { M3Card } from '@/components/material/m3-card';
 import { M3Badge } from '@/components/material/m3-badge';
 import { M3Button } from '@/components/material/m3-button';
+import { ScreenLoader } from '@/components/common/screen-loader';
 import { MaterialIcons } from '@expo/vector-icons';
 
 function formatBytes(bytes: number): string {
@@ -118,7 +118,7 @@ export default function MediaDetailScreen() {
     if (!streamUrl) return;
     try {
       await Share.share({
-        message: `Watch/Stream ${item?.current_relative_path}: ${streamUrl}`,
+        message: `Stream ${item?.current_relative_path}: ${streamUrl}`,
         url: streamUrl,
       });
     } catch {
@@ -130,16 +130,18 @@ export default function MediaDetailScreen() {
     if (item?.album_id) {
       setSelectedAlbumId(item.album_id);
       router.dismiss();
-      router.push('/media');
+      router.push(`/album/${item.album_id}`);
     }
   };
 
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={[styles.loadingText, { color: colors.onSurfaceVariant }]}>
-          Loading media details...
-        </Text>
+        <ScreenLoader
+          message="Loading media inspector..."
+          subMessage="Retrieving file metadata & HTTP 206 stream URL"
+          icon="perm-media"
+        />
       </View>
     );
   }
@@ -147,7 +149,7 @@ export default function MediaDetailScreen() {
   if (!item) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <MaterialIcons name="error-outline" size={48} color={colors.error} />
+        <MaterialIcons name="error-outline" size={54} color={colors.error} />
         <Text style={[styles.errorTitle, { color: colors.onSurface }]}>
           Media item not found
         </Text>
@@ -156,7 +158,8 @@ export default function MediaDetailScreen() {
   }
 
   const fileName = item.current_relative_path.split('/').pop() || 'media';
-  const playerHeight = Math.min(320, width * 0.65);
+  const extension = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : 'FILE';
+  const playerHeight = Math.min(360, width * 0.72);
 
   return (
     <ScrollView
@@ -166,8 +169,8 @@ export default function MediaDetailScreen() {
         { paddingBottom: insets.bottom + Spacing.seven },
       ]}
     >
-      {/* Hero Media Player / Viewer */}
-      <View style={[styles.mediaViewerContainer, { height: playerHeight, backgroundColor: '#000' }]}>
+      {/* Hero Media Player / Stage */}
+      <View style={[styles.mediaStageContainer, { height: playerHeight, backgroundColor: '#090A0F' }]}>
         {isVideo ? (
           <VideoView
             player={player}
@@ -186,10 +189,25 @@ export default function MediaDetailScreen() {
           />
         )}
 
+        {/* Floating Top Right Badges */}
+        <View style={styles.topRightStageBadges}>
+          <View style={[styles.stageBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+            <Text style={styles.stageBadgeText}>{extension}</Text>
+          </View>
+          {isVideo && item.duration_seconds && (
+            <View style={[styles.stageBadge, { backgroundColor: colors.primary }]}>
+              <MaterialIcons name="play-arrow" size={14} color="#FFF" style={{ marginRight: 2 }} />
+              <Text style={[styles.stageBadgeText, { color: '#FFF' }]}>
+                {formatDuration(item.duration_seconds)}
+              </Text>
+            </View>
+          )}
+        </View>
+
         {syncStatus !== 'connected' && (
           <View style={styles.offlineViewerOverlay}>
-            <MaterialIcons name="wifi-off" size={20} color="#FFF" style={{ marginRight: 6 }} />
-            <Text style={styles.offlineOverlayText}>Offline • Server not reachable</Text>
+            <MaterialIcons name="wifi-off" size={18} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={styles.offlineOverlayText}>Offline • LAN Server Unreachable</Text>
           </View>
         )}
       </View>
@@ -211,16 +229,16 @@ export default function MediaDetailScreen() {
         />
       </View>
 
-      {/* Title & Path Header */}
+      {/* Title & Album Details Card */}
       <M3Card variant="elevated" style={styles.titleCard}>
         <View style={styles.titleRow}>
           <Text style={[styles.fileName, { color: colors.onSurface }]} numberOfLines={2}>
             {fileName}
           </Text>
           <M3Badge
-            label={isVideo ? 'VIDEO' : 'IMAGE'}
+            label={isVideo ? 'VIDEO' : 'PHOTO'}
             variant={isVideo ? 'primary' : 'secondary'}
-            size="small"
+            size="medium"
           />
         </View>
 
@@ -230,32 +248,43 @@ export default function MediaDetailScreen() {
 
         {item.album_name && (
           <Pressable onPress={handleJumpToAlbum} style={styles.albumLinkRow}>
-            <MaterialIcons name="folder" size={16} color={colors.primary} />
-            <Text style={[styles.albumLinkText, { color: colors.primary }]}>
-              Album: {item.album_name}
-            </Text>
-            <MaterialIcons name="arrow-forward" size={14} color={colors.primary} />
+            <View style={[styles.folderIconBadge, { backgroundColor: colors.primaryContainer }]}>
+              <MaterialIcons name="folder-special" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.albumLabelSub, { color: colors.outline }]}>Album Collection</Text>
+              <Text style={[styles.albumLinkTitle, { color: colors.onSurface }]}>
+                {item.album_name}
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={20} color={colors.primary} />
           </Pressable>
         )}
       </M3Card>
 
       {/* Segmented Specs Tabs */}
-      <View style={styles.tabHeaderRow}>
+      <View style={[styles.tabHeaderRow, { backgroundColor: colors.surfaceContainerHigh }]}>
         <Pressable
           onPress={() => setActiveTab('details')}
           style={[
             styles.tabBtn,
             activeTab === 'details' && {
-              backgroundColor: colors.primaryContainer,
-              borderColor: colors.primary,
+              backgroundColor: colors.surfaceContainerLowest,
+              ...Elevation.level1,
             },
           ]}
         >
+          <MaterialIcons
+            name="info-outline"
+            size={16}
+            color={activeTab === 'details' ? colors.primary : colors.outline}
+            style={{ marginRight: 4 }}
+          />
           <Text
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'details' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                color: activeTab === 'details' ? colors.onSurface : colors.onSurfaceVariant,
                 fontWeight: activeTab === 'details' ? '800' : '600',
               },
             ]}
@@ -269,21 +298,27 @@ export default function MediaDetailScreen() {
           style={[
             styles.tabBtn,
             activeTab === 'exif' && {
-              backgroundColor: colors.primaryContainer,
-              borderColor: colors.primary,
+              backgroundColor: colors.surfaceContainerLowest,
+              ...Elevation.level1,
             },
           ]}
         >
+          <MaterialIcons
+            name="tune"
+            size={16}
+            color={activeTab === 'exif' ? colors.primary : colors.outline}
+            style={{ marginRight: 4 }}
+          />
           <Text
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'exif' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                color: activeTab === 'exif' ? colors.onSurface : colors.onSurfaceVariant,
                 fontWeight: activeTab === 'exif' ? '800' : '600',
               },
             ]}
           >
-            Technical Specs
+            Specs & EXIF
           </Text>
         </Pressable>
 
@@ -292,16 +327,22 @@ export default function MediaDetailScreen() {
           style={[
             styles.tabBtn,
             activeTab === 'tags' && {
-              backgroundColor: colors.primaryContainer,
-              borderColor: colors.primary,
+              backgroundColor: colors.surfaceContainerLowest,
+              ...Elevation.level1,
             },
           ]}
         >
+          <MaterialIcons
+            name="label-outline"
+            size={16}
+            color={activeTab === 'tags' ? colors.primary : colors.outline}
+            style={{ marginRight: 4 }}
+          />
           <Text
             style={[
               styles.tabBtnText,
               {
-                color: activeTab === 'tags' ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                color: activeTab === 'tags' ? colors.onSurface : colors.onSurfaceVariant,
                 fontWeight: activeTab === 'tags' ? '800' : '600',
               },
             ]}
@@ -311,13 +352,13 @@ export default function MediaDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Tab 1: Overview */}
+      {/* Tab 1: Overview Specs */}
       {activeTab === 'details' && (
         <M3Card variant="filled" style={styles.specsCard}>
           <View style={styles.specRow}>
             <Text style={[styles.specKey, { color: colors.outline }]}>File Size</Text>
             <Text style={[styles.specVal, { color: colors.onSurface }]}>
-              {formatBytes(item.file_size)} ({item.file_size.toLocaleString()} bytes)
+              {formatBytes(item.file_size)} ({item.file_size.toLocaleString()} B)
             </Text>
           </View>
 
@@ -343,7 +384,7 @@ export default function MediaDetailScreen() {
           </View>
 
           <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>Original Path</Text>
+            <Text style={[styles.specKey, { color: colors.outline }]}>Relative Path</Text>
             <Text style={[styles.specVal, { color: colors.onSurface }]} numberOfLines={2}>
               {item.original_relative_path}
             </Text>
@@ -358,21 +399,21 @@ export default function MediaDetailScreen() {
             <View style={styles.specRow}>
               <Text style={[styles.specKey, { color: colors.outline }]}>Resolution</Text>
               <Text style={[styles.specVal, { color: colors.onSurface }]}>
-                {parsedMetadata.width} × {parsedMetadata.height}
+                {parsedMetadata.width} × {parsedMetadata.height} px
               </Text>
             </View>
           ) : null}
 
           {parsedMetadata.codec ? (
             <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Codec</Text>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Video Codec</Text>
               <Text style={[styles.specVal, { color: colors.onSurface }]}>{parsedMetadata.codec}</Text>
             </View>
           ) : null}
 
           {parsedMetadata.camera_make || parsedMetadata.camera_model ? (
             <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Camera</Text>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Camera Model</Text>
               <Text style={[styles.specVal, { color: colors.onSurface }]}>
                 {[parsedMetadata.camera_make, parsedMetadata.camera_model].filter(Boolean).join(' ')}
               </Text>
@@ -381,7 +422,7 @@ export default function MediaDetailScreen() {
 
           {parsedMetadata.date_taken ? (
             <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Captured At</Text>
+              <Text style={[styles.specKey, { color: colors.outline }]}>Captured Date</Text>
               <Text style={[styles.specVal, { color: colors.onSurface }]}>
                 {parsedMetadata.date_taken}
               </Text>
@@ -389,10 +430,17 @@ export default function MediaDetailScreen() {
           ) : null}
 
           {/* SHA-256 Checksum Hash */}
-          <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>SHA-256 Hash</Text>
+          <View style={[styles.specRow, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
+            <Text style={[styles.specKey, { color: colors.outline, marginBottom: 4 }]}>SHA-256 Checksum Hash</Text>
             <Text
-              style={[styles.hashVal, { color: colors.primary, backgroundColor: colors.surfaceContainerHigh }]}
+              style={[
+                styles.hashValBox,
+                {
+                  color: colors.primary,
+                  backgroundColor: colors.surfaceContainerHigh,
+                  borderColor: colors.outlineVariant,
+                },
+              ]}
               selectable
             >
               {item.file_hash}
@@ -410,7 +458,7 @@ export default function MediaDetailScreen() {
                 <View
                   key={tag.id}
                   style={[
-                    styles.tagBadge,
+                    styles.tagBadgePill,
                     {
                       backgroundColor: colors.surfaceContainer,
                       borderColor: tag.color_hex || colors.primary,
@@ -423,9 +471,12 @@ export default function MediaDetailScreen() {
               ))}
             </View>
           ) : (
-            <Text style={[styles.noTagsText, { color: colors.outline }]}>
-              No tags applied to this media item.
-            </Text>
+            <View style={styles.emptyTagsBox}>
+              <MaterialIcons name="label-off" size={32} color={colors.outline} />
+              <Text style={[styles.noTagsText, { color: colors.outline }]}>
+                No taxonomy tags assigned to this media item.
+              </Text>
+            </View>
           )}
         </M3Card>
       )}
@@ -449,38 +500,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Spacing.four,
   },
-  loadingText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   errorTitle: {
     fontSize: 16,
     fontWeight: '700',
     marginTop: Spacing.two,
   },
-  mediaViewerContainer: {
+  mediaStageContainer: {
     width: '100%',
     borderRadius: Shapes.large,
     overflow: 'hidden',
     marginBottom: Spacing.three,
     position: 'relative',
-    ...Elevation.level2,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    ...Elevation.level3,
+  },
+  topRightStageBadges: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stageBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Shapes.small,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stageBadgeText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   offlineViewerOverlay: {
     position: 'absolute',
-    bottom: 8,
-    left: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: Shapes.small,
+    bottom: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Shapes.medium,
     flexDirection: 'row',
     alignItems: 'center',
   },
   offlineOverlayText: {
     color: '#FFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   actionsBar: {
@@ -497,43 +567,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   fileName: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: -0.3,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.4,
     flex: 1,
     marginRight: Spacing.two,
   },
   fullPath: {
     fontSize: 12,
-    marginTop: 4,
-    lineHeight: 16,
+    marginTop: 6,
+    lineHeight: 17,
   },
   albumLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.two,
-    paddingTop: Spacing.two,
+    marginTop: Spacing.three,
+    paddingTop: Spacing.two + 2,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(150,150,150,0.15)',
+    borderTopColor: 'rgba(150,150,150,0.12)',
   },
-  albumLinkText: {
-    fontSize: 12,
-    fontWeight: '700',
-    marginHorizontal: 4,
-  },
-  tabHeaderRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    marginBottom: Spacing.two,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 8,
+  folderIconBadge: {
+    width: 36,
+    height: 36,
     borderRadius: Shapes.small,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    marginRight: Spacing.two,
+  },
+  albumLabelSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  albumLinkTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tabHeaderRow: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: Shapes.medium,
+    marginBottom: Spacing.three,
+    gap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: Shapes.small,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabBtnText: {
     fontSize: 12,
@@ -544,40 +627,42 @@ const styles = StyleSheet.create({
   specRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(150,150,150,0.12)',
   },
   specKey: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
   specVal: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     textAlign: 'right',
     flex: 1,
     marginLeft: Spacing.two,
   },
-  hashVal: {
-    fontSize: 10,
+  hashValBox: {
+    width: '100%',
+    fontSize: 11,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    padding: 4,
-    borderRadius: 4,
-    flex: 1,
-    textAlign: 'right',
+    padding: Spacing.two,
+    borderRadius: Shapes.small,
+    borderWidth: 1,
+    marginTop: 4,
   },
   tagsCloud: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.one + 2,
+    gap: Spacing.two,
+    paddingVertical: Spacing.one,
   },
-  tagBadge: {
+  tagBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Shapes.large,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Shapes.full,
     borderWidth: 1,
   },
   tagDot: {
@@ -587,12 +672,17 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   tagText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  emptyTagsBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.four,
   },
   noTagsText: {
-    fontSize: 12,
-    textAlign: 'center',
-    paddingVertical: Spacing.two,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: Spacing.one,
   },
 });
