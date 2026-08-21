@@ -179,7 +179,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentIp = targetIp ?? get().ip;
     const currentPort = targetPort ?? get().port;
 
+    // First test connection & update live latency / serverInfo / status
+    set({ status: 'testing', errorMessage: null });
+    const connTest = await testServerConnection(currentIp, currentPort);
+    set({ latencyMs: connTest.latencyMs });
+
+    if (!connTest.reachable || !connTest.serverInfo) {
+      const err = connTest.error ?? 'Server is not reachable';
+      set({
+        status: 'error',
+        errorMessage: err,
+        serverInfo: connTest.serverInfo ?? {
+          status: 'offline',
+          server: 'Unreachable',
+          error: err,
+        },
+        syncProgress: null,
+      });
+      return { success: false, error: err };
+    }
+
     set({
+      serverInfo: connTest.serverInfo,
       status: 'downloading',
       errorMessage: null,
       syncProgress: { bytesWritten: 0, contentLength: 0, percentage: 0 },
@@ -230,7 +251,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedHistory = await getServerHistory();
 
     set({
-      status: 'success',
+      status: 'connected',
       syncProgress: null,
       lastSyncTime: nowIso,
       serverInfo: info,
