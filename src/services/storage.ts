@@ -4,6 +4,10 @@ import { SavedServer } from '@/types/models';
 export const DEFAULT_SERVER_IP = '192.168.1.100';
 export const DEFAULT_SERVER_PORT = 8080;
 export const MAX_SAVED_SERVERS = 5;
+export const DEFAULT_PAGE_SIZE = 96;
+export const MIN_PAGE_SIZE = 24;
+export const MAX_PAGE_SIZE = 180;
+export const PAGE_SIZE_OPTIONS = [24, 48, 72, 96, 120, 144, 168, 180];
 
 interface AppStorageData {
   serverIp: string;
@@ -11,6 +15,7 @@ interface AppStorageData {
   serverHistory: SavedServer[];
   lastSyncTime: string | null;
   viewMode: 'grid' | 'list';
+  pageSize: number;
 }
 
 const defaultData: AppStorageData = {
@@ -19,6 +24,7 @@ const defaultData: AppStorageData = {
   serverHistory: [],
   lastSyncTime: null,
   viewMode: 'grid',
+  pageSize: DEFAULT_PAGE_SIZE,
 };
 
 let memoryCache: AppStorageData = { ...defaultData };
@@ -122,5 +128,17 @@ export async function getViewMode(): Promise<'grid' | 'list'> {
 export async function setViewMode(mode: 'grid' | 'list'): Promise<void> {
   const data = await loadDataFromDisk();
   data.viewMode = mode;
+  await saveDataToDisk();
+}
+
+export async function getSavedPageSize(): Promise<number> {
+  const data = await loadDataFromDisk();
+  return data.pageSize || DEFAULT_PAGE_SIZE;
+}
+
+export async function savePageSize(size: number): Promise<void> {
+  const clamped = Math.max(MIN_PAGE_SIZE, Math.min(MAX_PAGE_SIZE, size));
+  const data = await loadDataFromDisk();
+  data.pageSize = clamped;
   await saveDataToDisk();
 }

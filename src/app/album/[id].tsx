@@ -43,15 +43,15 @@ export default function AlbumGalleryScreen() {
 
   const albumId = id ? parseInt(id, 10) : NaN;
 
+  const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize } = useAppStore();
+
   const [query, setQuery] = useState('');
   const [type, setType] = useState<MediaTypeFilter>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'file_size' | 'current_relative_path'>('created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [layoutMode, setLayoutMode] = useState<ViewLayoutMode>('grid');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(24);
-
-  const { ip, port, status: syncStatus } = useAppStore();
+  const [pageSize, setPageSize] = useState(storePageSize || 96);
 
   // 1. Fetch Album Metadata via TanStack Query
   const { data: album, isLoading: albumLoading } = useQuery({
@@ -91,6 +91,7 @@ export default function AlbumGalleryScreen() {
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
+    updatePageSize(newSize);
     setPage(1);
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };

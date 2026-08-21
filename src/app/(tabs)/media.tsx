@@ -76,6 +76,7 @@ export default function MediaExplorerScreen() {
     tags,
     stats,
     fetchMediaPage,
+    updatePageSize,
   } = useAppStore();
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function MediaExplorerScreen() {
 
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
+    updatePageSize(newSize);
     setCurrentPage(1);
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };

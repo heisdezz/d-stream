@@ -13,6 +13,6 @@ export const sortByAtom = atom<SortByField>('created_at');
 export const sortOrderAtom = atom<SortOrder>('DESC');
 export const viewModeAtom = atom<ViewLayoutMode>('grid');
 
-// Real pagination atoms
+// Real pagination atoms - default 96
 export const currentPageAtom = atom<number>(1);
-export const pageSizeAtom = atom<number>(24);
+export const pageSizeAtom = atom<number>(96);

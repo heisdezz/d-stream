@@ -6,11 +6,12 @@ import {
   Pressable,
   Modal,
   TextInput,
-  Platform,
+  ScrollView,
 } from 'react-native';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { Shapes, Spacing, Elevation } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
+import { PAGE_SIZE_OPTIONS } from '@/services/storage';
 
 export interface PaginationBarProps {
   currentPage: number;
@@ -19,8 +20,6 @@ export interface PaginationBarProps {
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
 }
-
-const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
 export const PaginationBar: React.FC<PaginationBarProps> = ({
   currentPage,
@@ -51,7 +50,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant }]}>
-      {/* Range Info */}
+      {/* Range Info & Page Size Options */}
       <View style={styles.topInfoRow}>
         <Text style={[styles.rangeText, { color: colors.onSurfaceVariant }]}>
           Showing <Text style={{ fontWeight: '800', color: colors.onSurface }}>{startItem}-{endItem}</Text> of{' '}
@@ -59,7 +58,12 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
         </Text>
 
         {onPageSizeChange && (
-          <View style={styles.pageSizeRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pageSizeScroll}
+            style={styles.pageSizeWrapper}
+          >
             <Text style={[styles.pageSizeLabel, { color: colors.outline }]}>Per page:</Text>
             {PAGE_SIZE_OPTIONS.map((size) => (
               <Pressable
@@ -69,6 +73,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
                   styles.sizePill,
                   {
                     backgroundColor: pageSize === size ? colors.primary : colors.surfaceContainerHighest,
+                    borderColor: pageSize === size ? colors.primary : colors.outlineVariant,
                   },
                 ]}
               >
@@ -85,7 +90,7 @@ export const PaginationBar: React.FC<PaginationBarProps> = ({
                 </Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         )}
       </View>
 
@@ -248,29 +253,31 @@ const styles = StyleSheet.create({
     ...Elevation.level1,
   },
   topInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: Spacing.two,
-    flexWrap: 'wrap',
-    gap: 8,
   },
   rangeText: {
     fontSize: 12,
+    marginBottom: 6,
   },
-  pageSizeRow: {
+  pageSizeWrapper: {
+    flexDirection: 'row',
+  },
+  pageSizeScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    paddingVertical: 2,
   },
   pageSizeLabel: {
     fontSize: 11,
-    marginRight: 2,
+    fontWeight: '600',
+    marginRight: 4,
   },
   sizePill: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: Shapes.small,
+    borderWidth: 1,
   },
   sizePillText: {
     fontSize: 11,

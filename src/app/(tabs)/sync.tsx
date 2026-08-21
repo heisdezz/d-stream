@@ -9,9 +9,12 @@ import {
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSetAtom } from "jotai";
+import { pageSizeAtom } from "@/store/atoms";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { useAppStore } from "@/store/use-app-store";
 import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
+import { PAGE_SIZE_OPTIONS } from "@/services/storage";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Badge } from "@/components/material/m3-badge";
@@ -38,6 +41,7 @@ function formatRelativeTime(iso?: string): string {
 export default function SyncScreen() {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
+  const setPageSizeAtom = useSetAtom(pageSizeAtom);
 
   const {
     ip,
@@ -52,8 +56,10 @@ export default function SyncScreen() {
     lastSyncTime,
     latencyMs,
     stats,
+    pageSize,
     checkConnection,
     syncDatabase,
+    updatePageSize,
     removeHistoryServer,
   } = useAppStore();
 
@@ -103,25 +109,30 @@ export default function SyncScreen() {
     await removeHistoryServer(delIp, delPort);
   };
 
-  // const faqs = [
-  //   {
-  //     q: 'How do I start the sync server on Linux?',
-  //     a: 'Open the External Drive Media Organizer desktop app, navigate to Settings in the sidebar, scroll to "Local Network Mobile Sync", and toggle the switch to ON.',
-  //   },
-  //   {
-  //     q: 'Cannot connect from mobile device?',
-  //     a: 'Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp',
-  //   },
-  //   {
-  //     q: 'How does live media streaming work?',
-  //     a: 'The mobile app connects to http://<IP>:8080/media/<id> to stream full-res video with HTTP 206 Range seeking support and http://<IP>:8080/thumbnail/<id> for fast JPEG thumbnails.',
-  //   },
-  //   {
-  //     q: 'How does database snapshot sync work?',
-  //     a: 'The server creates an exFAT-safe SQLite VACUUM INTO snapshot and streams .media_library.db over LAN. The mobile app saves it locally, allowing complete offline search and inspection.',
-  //   },
-  // ];
-  const faqs: { q: string; a: string }[] = [];
+  const handleSelectPageSize = async (size: number) => {
+    setPageSizeAtom(size);
+    await updatePageSize(size);
+  };
+
+  const faqs = [
+    {
+      q: "How do I start the sync server on Linux?",
+      a: 'Open the External Drive Media Organizer desktop app, navigate to Settings in the sidebar, scroll to "Local Network Mobile Sync", and toggle the switch to ON.',
+    },
+    {
+      q: "Cannot connect from mobile device?",
+      a: "Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp",
+    },
+    {
+      q: "How does live media streaming work?",
+      a: "The mobile app connects to http://<IP>:8080/media/<id> to stream full-res video with HTTP 206 Range seeking support and http://<IP>:8080/thumbnail/<id> for fast JPEG thumbnails.",
+    },
+    {
+      q: "How does database snapshot sync work?",
+      a: "The server creates an exFAT-safe SQLite VACUUM INTO snapshot and streams .media_library.db over LAN. The mobile app saves it locally, allowing complete offline search and inspection.",
+    },
+  ];
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -364,6 +375,83 @@ export default function SyncScreen() {
         </View>
       </M3Card>
 
+      {/* Display & Pagination Preferences Card */}
+      <M3Card variant="elevated" style={styles.prefCard}>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="tune" size={22} color={colors.primary} />
+          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+            Display & Pagination
+          </Text>
+          <M3Badge
+            label={`${pageSize} / page`}
+            variant="primary"
+            size="small"
+            style={{ marginLeft: "auto" }}
+          />
+        </View>
+
+        <Text style={[styles.prefDesc, { color: colors.onSurfaceVariant }]}>
+          Choose how many media items are loaded per page in Media Explorer and Album galleries. Multiples of 24 (min: 24, max: 180).
+        </Text>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pageSizePillsContainer}
+          style={{ marginTop: Spacing.two }}
+        >
+          {PAGE_SIZE_OPTIONS.map((size) => {
+            const isSelected = pageSize === size;
+            return (
+              <Pressable
+                key={size}
+                onPress={() => handleSelectPageSize(size)}
+                style={({ pressed }) => [
+                  styles.prefSizePill,
+                  {
+                    backgroundColor: isSelected
+                      ? colors.primary
+                      : colors.surfaceContainerHighest,
+                    borderColor: isSelected
+                      ? colors.primary
+                      : colors.outlineVariant,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.prefSizeText,
+                    {
+                      color: isSelected
+                        ? colors.onPrimary
+                        : colors.onSurface,
+                      fontWeight: isSelected ? "900" : "600",
+                    },
+                  ]}
+                >
+                  {size}
+                </Text>
+                {size === 96 && (
+                  <Text
+                    style={[
+                      styles.defaultTag,
+                      {
+                        color: isSelected
+                          ? colors.onPrimary
+                          : colors.outline,
+                      },
+                    ]}
+                  >
+                    (Default)
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </M3Card>
+
       {/* Local SQLite Database Info */}
       <M3Card variant="filled" style={styles.dbInfoCard}>
         <View style={styles.cardHeader}>
@@ -543,6 +631,34 @@ const styles = StyleSheet.create({
   },
   configCard: {
     marginBottom: Spacing.three,
+  },
+  prefCard: {
+    marginBottom: Spacing.three,
+  },
+  prefDesc: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  pageSizePillsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  prefSizePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Shapes.medium,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  prefSizeText: {
+    fontSize: 14,
+  },
+  defaultTag: {
+    fontSize: 9,
+    marginTop: 1,
   },
   cardHeader: {
     flexDirection: "row",
