@@ -57,11 +57,11 @@ export const M3StatCard: React.FC<M3StatCardProps> = ({
       variant="filled"
       onPress={onPress}
       style={[{ flex: 1, minWidth: 140 }, style]}
-      padding="two"
+      padding="three"
     >
       <View style={styles.headerRow}>
         <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
-          <MaterialIcons name={icon} size={20} color={iconColor} />
+          <MaterialIcons name={icon} size={22} color={iconColor} />
         </View>
         <Text style={[styles.title, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
           {title}
@@ -73,7 +73,7 @@ export const M3StatCard: React.FC<M3StatCardProps> = ({
       </Text>
 
       {subtitle && (
-        <Text style={[styles.subtitle, { color: colors.outline }]} numberOfLines={1}>
+        <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]} numberOfLines={1}>
           {subtitle}
         </Text>
       )}
@@ -85,29 +85,31 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.one,
+    marginBottom: Spacing.two,
   },
   iconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: Shapes.small,
+    width: 38,
+    height: 38,
+    borderRadius: Shapes.medium,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: Spacing.one,
+    marginRight: Spacing.two,
   },
   title: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.1,
     flex: 1,
   },
   value: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-    marginTop: Spacing.half,
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.6,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
   },
 });
