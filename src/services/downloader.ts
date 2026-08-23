@@ -2,7 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform, PermissionsAndroid } from "react-native";
 import axios from "axios";
 import { toast } from "sonner-native";
-import { getMediaStreamUrl } from "@/services/sync-api";
+import { getMediaStreamUrl, getThumbnailUrl } from "@/services/sync-api";
 import {
   getSavedDownloadLocation,
   saveDownloadedItemRecord,
@@ -230,9 +230,30 @@ export async function downloadMediaItem(
       return { success: false, error: "File missing" };
     }
 
+    // Also download thumbnail into .thumbs/ subfolder for offline mediaCard display
+    let thumbnailLocalUri: string | undefined = undefined;
+    try {
+      const thumbsDir = `${destDir}.thumbs/`;
+      const thumbsDirInfo = await FileSystem.getInfoAsync(thumbsDir);
+      if (!thumbsDirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(thumbsDir, { intermediates: true });
+      }
+
+      const thumbUrl = getThumbnailUrl(ip, port, item.id);
+      const thumbDestPath = `${thumbsDir}${item.id}.jpg`;
+      const thumbResult = await FileSystem.downloadAsync(thumbUrl, thumbDestPath);
+      if (thumbResult && thumbResult.uri) {
+        thumbnailLocalUri = thumbResult.uri;
+        console.log("[Downloader] Saved thumbnail to .thumbs:", thumbnailLocalUri);
+      }
+    } catch (thumbErr) {
+      console.warn("[Downloader] Could not download thumbnail to .thumbs:", thumbErr);
+    }
+
     const record: DownloadedItemRecord = {
       mediaId: item.id,
       localUri: result.uri,
+      thumbnailLocalUri,
       albumName: item.album_name || "Uncategorized",
       fileName,
       fileSize: fileCheck.size ?? item.file_size,

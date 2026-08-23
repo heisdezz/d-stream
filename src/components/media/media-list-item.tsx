@@ -7,6 +7,8 @@ import { Shapes, Spacing, Elevation } from '@/constants/theme';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getThumbnailUrl } from '@/services/sync-api';
 
+import { useAppStore } from '@/store/use-app-store';
+
 export interface MediaListItemProps {
   item: MediaItem;
   onPress: (item: MediaItem) => void;
@@ -43,12 +45,17 @@ export const MediaListItem: React.FC<MediaListItemProps> = ({
   serverPort = 8080,
 }) => {
   const { colors } = useMaterialTheme();
+  const { downloadedItems } = useAppStore();
   const [imageError, setImageError] = useState(false);
   const isVideo = item.mime_type.startsWith('video/');
   const fileName = item.current_relative_path.split('/').pop() || 'media';
   const formatBadge = getFormatBadge(item.mime_type, item.current_relative_path);
 
-  const thumbnailUrl = serverIp ? getThumbnailUrl(serverIp, serverPort, item.id) : null;
+  const downloadedRecord = downloadedItems[item.id];
+  const thumbnailUrl =
+    downloadedRecord?.thumbnailLocalUri ||
+    downloadedRecord?.localUri ||
+    (serverIp ? getThumbnailUrl(serverIp, serverPort, item.id) : null);
 
   return (
     <Pressable

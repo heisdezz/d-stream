@@ -13,6 +13,7 @@ export const DEFAULT_DOWNLOAD_LOCATION = 'Movies/d-stream';
 export interface DownloadedItemRecord {
   mediaId: number;
   localUri: string;
+  thumbnailLocalUri?: string;
   albumName: string;
   fileName: string;
   fileSize: number;
