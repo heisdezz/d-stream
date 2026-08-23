@@ -38,8 +38,7 @@ export default function AlbumsScreen() {
   const router = useRouter();
 
   const [currentTab, setCurrentTab] = useState<CollectionTab>('albums');
-  const [searchInput, setSearchInput] = useState('');
-  const debouncedSearch = useDebounce(searchInput, 300);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const setSelectedTagId = useSetAtom(selectedTagIdAtom);
   const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
@@ -74,25 +73,25 @@ export default function AlbumsScreen() {
 
   // Debounced search filtering for albums
   const filteredAlbums = useMemo(() => {
-    if (!debouncedSearch.trim()) return albumsData;
-    const q = debouncedSearch.toLowerCase().trim();
+    if (!searchQuery.trim()) return albumsData;
+    const q = searchQuery.toLowerCase().trim();
     return albumsData.filter(
       (a) =>
         a.name.toLowerCase().includes(q) ||
         (a.relative_path && a.relative_path.toLowerCase().includes(q))
     );
-  }, [albumsData, debouncedSearch]);
+  }, [albumsData, searchQuery]);
 
   // Debounced search filtering for tags
   const filteredTags = useMemo(() => {
-    if (!debouncedSearch.trim()) return tagsData;
-    const q = debouncedSearch.toLowerCase().trim();
+    if (!searchQuery.trim()) return tagsData;
+    const q = searchQuery.toLowerCase().trim();
     return tagsData.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         (t.category && t.category.toLowerCase().includes(q))
     );
-  }, [tagsData, debouncedSearch]);
+  }, [tagsData, searchQuery]);
 
   const tagsByCategory = useMemo(() => {
     return filteredTags.reduce<Record<string, Tag[]>>((acc, tag) => {
@@ -117,8 +116,8 @@ export default function AlbumsScreen() {
         />
 
         <M3SearchBar
-          value={searchInput}
-          onChangeText={setSearchInput}
+          value={searchQuery}
+          onSearch={setSearchQuery}
           placeholder={
             currentTab === 'albums'
               ? 'Filter albums by name or folder path...'
@@ -163,7 +162,7 @@ export default function AlbumsScreen() {
             <View style={styles.emptyState}>
               <MaterialIcons name="folder-off" size={44} color={colors.outline} />
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                {debouncedSearch ? 'No matching albums found' : 'No albums found'}
+                {searchQuery ? 'No matching albums found' : 'No albums found'}
               </Text>
             </View>
           ) : (
@@ -194,7 +193,7 @@ export default function AlbumsScreen() {
             <View style={styles.emptyState}>
               <MaterialIcons name="label-off" size={44} color={colors.outline} />
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                {debouncedSearch ? 'No matching tags found' : 'No tags found'}
+                {searchQuery ? 'No matching tags found' : 'No tags found'}
               </Text>
             </View>
           ) : (

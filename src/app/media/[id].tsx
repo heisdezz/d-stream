@@ -28,6 +28,7 @@ import { M3Card } from '@/components/material/m3-card';
 import { M3Badge } from '@/components/material/m3-badge';
 import { M3Button } from '@/components/material/m3-button';
 import { ScreenLoader } from '@/components/common/screen-loader';
+import { toast } from 'sonner-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 function formatBytes(bytes: number): string {
@@ -124,14 +125,17 @@ export default function MediaDetailScreen() {
     if (!item) return;
     if (downloadedRecord) {
       Alert.alert(
-        'Downloaded Offline Copy',
+        'Offline Copy Ready',
         `File is saved locally in ${downloadedRecord.albumName || 'General'} album folder.\n\nPath: ${downloadedRecord.localUri}`,
         [
-          { text: 'OK', style: 'cancel' },
+          { text: 'Close', style: 'cancel' },
           {
             text: 'Delete Download',
             style: 'destructive',
-            onPress: () => removeDownloadedMediaItem(item.id),
+            onPress: async () => {
+              await removeDownloadedMediaItem(item.id);
+              toast.info('Offline copy removed from device storage.');
+            },
           },
         ]
       );
@@ -139,21 +143,13 @@ export default function MediaDetailScreen() {
     }
 
     if (syncStatus !== 'connected') {
-      Alert.alert(
-        'Server Offline',
-        'Connect to your desktop server over LAN to download this media item for offline playback.'
-      );
+      toast.error('Connect to your desktop server over LAN to download this media item.');
       return;
     }
 
     const res = await startDownloadMediaItem(item);
-    if (res.success) {
-      Alert.alert(
-        'Download Complete',
-        `Successfully downloaded ${isVideo ? 'video' : 'photo'} for offline playback!\n\nLocation: ${downloadLocation}/${item.album_name || 'General'}`
-      );
-    } else {
-      Alert.alert('Download Failed', res.error || 'Could not save file to disk.');
+    if (!res.success) {
+      toast.error(res.error || 'Could not save file to disk.');
     }
   };
 

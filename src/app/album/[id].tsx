@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,10 +16,9 @@ import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import { getAlbumById, getMediaItems } from '@/services/local-db';
 import { getThumbnailUrl } from '@/services/sync-api';
-import { useDebounce } from '@/hooks/use-debounce';
 import { MediaTypeFilter, ViewLayoutMode } from '@/store/atoms';
 import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
-import { M3SearchBar } from '@/components/material/m3-search-bar';
+import { DebouncedSearchBar } from '@/components/common/debounced-search-bar';
 import { M3SegmentedRow, SegmentItem } from '@/components/material/m3-segmented-row';
 import { M3Badge } from '@/components/material/m3-badge';
 import { MediaGridItem } from '@/components/media/media-grid-item';
@@ -47,9 +46,7 @@ export default function AlbumGalleryScreen() {
 
   const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize } = useAppStore();
 
-  const [searchInput, setSearchInput] = useState('');
-  const debouncedQuery = useDebounce(searchInput, 300);
-
+  const [searchQuery, setSearchQuery] = useState('');
   const [type, setType] = useState<MediaTypeFilter>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'file_size' | 'current_relative_path'>('created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
@@ -57,9 +54,11 @@ export default function AlbumGalleryScreen() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(storePageSize || 96);
 
-  useEffect(() => {
+  const handleSearch = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
     setPage(1);
-  }, [debouncedQuery]);
+    legendListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
 
   // 1. Fetch Album Metadata via TanStack Query
   const { data: album } = useQuery({
@@ -68,18 +67,18 @@ export default function AlbumGalleryScreen() {
     enabled: !isNaN(albumId),
   });
 
-  // 2. Fetch Album Media Items with Pagination via TanStack Query (Debounced query)
+  // 2. Fetch Album Media Items with Pagination via TanStack Query (debounced query only)
   const {
     data: mediaData,
     isLoading: mediaLoading,
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['album-media', albumId, page, pageSize, type, debouncedQuery, sortBy, sortOrder],
+    queryKey: ['album-media', albumId, page, pageSize, type, searchQuery, sortBy, sortOrder],
     queryFn: () =>
       getMediaItems({
         albumId,
-        query: debouncedQuery,
+        query: searchQuery,
         type,
         sortBy,
         sortOrder,
@@ -202,12 +201,13 @@ export default function AlbumGalleryScreen() {
         </View>
       </View>
 
-      {/* Debounced Search & Layout Switcher */}
+      {/* Extracted Debounced Search Bar with Action Button & Layout Switcher */}
       <View style={styles.searchRow}>
-        <M3SearchBar
-          value={searchInput}
-          onChangeText={setSearchInput}
-          placeholder="Filter items in this album..."
+        <DebouncedSearchBar
+          value={searchQuery}
+          onSearch={handleSearch}
+          placeholder="Search items in this album..."
+          debounceMs={450}
           style={{ flex: 1, marginRight: Spacing.two }}
         />
         <Pressable
@@ -314,7 +314,7 @@ export default function AlbumGalleryScreen() {
           <View style={styles.emptyStateBox}>
             <MaterialIcons name="folder-open" size={54} color={colors.outline} />
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-              {debouncedQuery ? 'No matching items in album' : 'Album is Empty'}
+              {searchQuery ? 'No matching items in album' : 'Album is Empty'}
             </Text>
             <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
               No media items found matching current filters inside this album.

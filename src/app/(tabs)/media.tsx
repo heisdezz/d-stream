@@ -53,12 +53,6 @@ export default function MediaExplorerScreen() {
   const legendListRef = useRef<LegendListRef>(null);
 
   const [query, setQuery] = useAtom(searchQueryAtom);
-  const [searchInput, setSearchInput] = useState(query);
-  const debouncedQuery = useDebounce(searchInput, 300);
-
-  useEffect(() => {
-    setQuery(debouncedQuery);
-  }, [debouncedQuery, setQuery]);
   const [type, setType] = useAtom(mediaTypeFilterAtom);
   const [selectedAlbumId, setSelectedAlbumId] = useAtom(selectedAlbumIdAtom);
   const [selectedTagId, setSelectedTagId] = useAtom(selectedTagIdAtom);
@@ -182,9 +176,9 @@ export default function MediaExplorerScreen() {
       {/* Docked Search & View Toggle Bar */}
       <View style={styles.searchRow}>
         <M3SearchBar
-          value={searchInput}
-          onChangeText={(text) => {
-            setSearchInput(text);
+          value={query}
+          onSearch={(text) => {
+            setQuery(text);
             setCurrentPage(1);
           }}
           placeholder="Search media by filename or path..."
