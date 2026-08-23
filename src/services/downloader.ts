@@ -1,14 +1,14 @@
-import * as FileSystem from 'expo-file-system/legacy';
-import { Platform, PermissionsAndroid } from 'react-native';
-import axios from 'axios';
-import { toast } from 'sonner-native';
-import { getMediaStreamUrl } from '@/services/sync-api';
+import * as FileSystem from "expo-file-system/legacy";
+import { Platform, PermissionsAndroid } from "react-native";
+import axios from "axios";
+import { toast } from "sonner-native";
+import { getMediaStreamUrl } from "@/services/sync-api";
 import {
   getSavedDownloadLocation,
   saveDownloadedItemRecord,
   DownloadedItemRecord,
-} from '@/services/storage';
-import { MediaItem } from '@/types/models';
+} from "@/services/storage";
+import { MediaItem } from "@/types/models";
 
 export interface DownloadProgress {
   mediaId: number;
@@ -18,12 +18,13 @@ export interface DownloadProgress {
 }
 
 export async function requestStoragePermission(): Promise<boolean> {
-  if (Platform.OS !== 'android') return true;
+  console.log("[Downloader] requestStoragePermission: platform=", Platform.OS, "apiLevel=", Platform.Version);
+  if (Platform.OS !== "android") return true;
   try {
     const apiLevel = Platform.Version;
     let permissionsToRequest: any[] = [];
 
-    if (typeof apiLevel === 'number' && apiLevel >= 33) {
+    if (typeof apiLevel === "number" && apiLevel >= 33) {
       permissionsToRequest = [
         PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
         PermissionsAndroid.PERMISSIONS.READ_MEDIA_VIDEO,
@@ -40,51 +41,85 @@ export async function requestStoragePermission(): Promise<boolean> {
     let allGranted = true;
     for (const perm of permissionsToRequest) {
       const check = await PermissionsAndroid.check(perm);
+      console.log("[Downloader] permission check:", perm, "=", check);
       if (!check) {
         allGranted = false;
         break;
       }
     }
 
-    if (allGranted) return true;
+    if (allGranted) {
+      console.log("[Downloader] all permissions already granted");
+      return true;
+    }
 
     // Request permissions explicitly
-    const results = await PermissionsAndroid.requestMultiple(permissionsToRequest);
+    const results =
+      await PermissionsAndroid.requestMultiple(permissionsToRequest);
+    console.log("[Downloader] requestMultiple results:", results);
     const isGranted = Object.values(results).some(
-      (res) => res === PermissionsAndroid.RESULTS.GRANTED
+      (res) => res === PermissionsAndroid.RESULTS.GRANTED,
     );
 
     if (!isGranted) {
-      toast.error('Storage permission is required to save media files locally.', {
-        duration: 4000,
-      });
+      toast.error(
+        "Storage permission is required to save media files locally.",
+        {
+          duration: 4000,
+        },
+      );
     }
 
+    console.log("[Downloader] permission final result:", isGranted);
     return isGranted;
   } catch (err) {
-    console.warn('[Downloader] Storage permission error:', err);
+    console.warn("[Downloader] Storage permission error:", err);
     return true;
   }
 }
 
 function sanitizeFolderName(name: string): string {
-  return name.replace(/[/\\?%*:|"<>]/g, '_').trim() || 'General';
+  return name.replace(/[/\\?%*:|"<>]/g, "_").trim() || "General";
 }
 
-export async function resolveDestinationDirectory(albumName?: string): Promise<string> {
-  const relLocation = await getSavedDownloadLocation();
-  const baseDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
+// True when the directory lives inside the app's private sandbox
+// (documentDirectory / cacheDirectory). Writing there needs no permission.
+// Only a genuinely external / shared-storage target requires READ_MEDIA_*.
+function isSandboxPath(dir: string): boolean {
+  const doc = FileSystem.documentDirectory ?? "";
+  const cache = FileSystem.cacheDirectory ?? "";
+  return (
+    (doc.length > 0 && dir.startsWith(doc)) ||
+    (cache.length > 0 && dir.startsWith(cache))
+  );
+}
 
-  const folderPath = relLocation.startsWith('/')
+export async function resolveDestinationDirectory(
+  albumName?: string,
+): Promise<string> {
+  const relLocation = await getSavedDownloadLocation();
+  const baseDir =
+    FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? "";
+
+  const folderPath = relLocation.startsWith("/")
     ? `${baseDir}${relLocation.slice(1)}`
     : `${baseDir}${relLocation}`;
 
-  const cleanAlbum = sanitizeFolderName(albumName || 'Uncategorized');
+  const cleanAlbum = sanitizeFolderName(albumName || "Uncategorized");
   const fullDestDir = `${folderPath}/${cleanAlbum}/`;
 
+  console.log("[Downloader] resolveDestinationDirectory:", {
+    relLocation,
+    baseDir,
+    folderPath,
+    fullDestDir,
+  });
+
   const dirInfo = await FileSystem.getInfoAsync(fullDestDir);
+  console.log("[Downloader] destDir exists?", dirInfo.exists);
   if (!dirInfo.exists) {
     await FileSystem.makeDirectoryAsync(fullDestDir, { intermediates: true });
+    console.log("[Downloader] created destDir:", fullDestDir);
   }
 
   return fullDestDir;
@@ -94,21 +129,42 @@ export async function downloadMediaItem(
   item: MediaItem,
   ip: string,
   port: number,
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
 ): Promise<{ success: boolean; localUri?: string; error?: string }> {
   const toastId = `dl-${item.id}`;
-
+  console.log("[Downloader] ===== downloadMediaItem START =====", {
+    itemId: item.id,
+    fileSize: item.file_size,
+    relativePath: item.current_relative_path,
+    album: item.album_name,
+  });
   try {
-    const hasPerm = await requestStoragePermission();
-    if (!hasPerm) {
-      toast.error('Storage permission was not granted.', { id: toastId });
-      return { success: false, error: 'Storage permission denied' };
-    }
-
     const streamUrl = getMediaStreamUrl(ip, port, item.id);
-    const fileName = item.current_relative_path.split('/').pop() || `media_${item.id}`;
+    const fileName =
+      item.current_relative_path.split("/").pop() || `media_${item.id}`;
     const destDir = await resolveDestinationDirectory(item.album_name);
     const destFilePath = `${destDir}${fileName}`;
+
+    // Only gate on storage permission when the user has pointed the download
+    // location at genuinely external/shared storage. Sandbox writes (the
+    // default) need no permission — and requesting READ_MEDIA_* there just
+    // aborts on Android 13+ in Expo Go. This keeps the gate ready for a future
+    // "save to external folder" option without breaking sandbox downloads.
+    if (!isSandboxPath(destDir)) {
+      console.log("[Downloader] external dest — requesting storage permission");
+      const hasPerm = await requestStoragePermission();
+      if (!hasPerm) {
+        console.log("[Downloader] ABORT: permission not granted");
+        toast.error("Storage permission was not granted.", { id: toastId });
+        return { success: false, error: "Storage permission denied" };
+      }
+    }
+
+    console.log("[Downloader] starting download:", {
+      streamUrl,
+      fileName,
+      destFilePath,
+    });
 
     toast.loading(`Downloading ${fileName}... 0%`, { id: toastId });
 
@@ -119,8 +175,20 @@ export async function downloadMediaItem(
       {},
       (progressData) => {
         const totalWritten = progressData.totalBytesWritten;
-        const totalExpected = progressData.totalBytesExpectedToWrite || item.file_size || 1;
-        const pct = Math.min(100, Math.round((totalWritten / totalExpected) * 100));
+        const totalExpected =
+          progressData.totalBytesExpectedToWrite || item.file_size || 1;
+        const pct = Math.min(
+          100,
+          Math.round((totalWritten / totalExpected) * 100),
+        );
+
+        console.log("[Downloader] progress:", {
+          itemId: item.id,
+          totalWritten,
+          expectedFromServer: progressData.totalBytesExpectedToWrite,
+          expectedUsed: totalExpected,
+          pct,
+        });
 
         toast.loading(`Downloading ${fileName}... ${pct}%`, { id: toastId });
 
@@ -130,25 +198,42 @@ export async function downloadMediaItem(
           totalBytesExpectedToWrite: totalExpected,
           percentage: pct,
         });
-      }
+      },
     );
 
     const result = await downloadResumable.downloadAsync();
+    console.log("[Downloader] downloadAsync result:", {
+      uri: result?.uri,
+      status: result?.status,
+      headers: result?.headers,
+    });
     if (!result || !result.uri) {
-      toast.error('Download failed to complete.', { id: toastId });
-      return { success: false, error: 'Download failed' };
+      console.log("[Downloader] ABORT: no result uri");
+      toast.error("Download failed to complete.", { id: toastId });
+      return { success: false, error: "Download failed" };
+    }
+
+    if (result.status !== 200) {
+      console.log("[Downloader] ABORT: non-200 status", result.status);
+      toast.error(`Server returned HTTP ${result.status}`, { id: toastId });
+      return { success: false, error: `HTTP ${result.status}` };
     }
 
     const fileCheck = await FileSystem.getInfoAsync(result.uri);
+    console.log("[Downloader] downloaded file check:", {
+      exists: fileCheck.exists,
+      size: fileCheck.exists ? (fileCheck as any).size : 0,
+    });
     if (!fileCheck.exists) {
-      toast.error('Downloaded file missing on disk.', { id: toastId });
-      return { success: false, error: 'File missing' };
+      console.log("[Downloader] ABORT: file missing on disk");
+      toast.error("Downloaded file missing on disk.", { id: toastId });
+      return { success: false, error: "File missing" };
     }
 
     const record: DownloadedItemRecord = {
       mediaId: item.id,
       localUri: result.uri,
-      albumName: item.album_name || 'Uncategorized',
+      albumName: item.album_name || "Uncategorized",
       fileName,
       fileSize: fileCheck.size ?? item.file_size,
       mimeType: item.mime_type,
@@ -156,16 +241,33 @@ export async function downloadMediaItem(
     };
 
     await saveDownloadedItemRecord(record);
-
-    toast.success(`Download complete! Saved to ${record.albumName}/${fileName}`, {
-      id: toastId,
-      duration: 4000,
+    console.log("[Downloader] ===== SUCCESS =====", {
+      localUri: result.uri,
+      savedSize: fileCheck.size,
     });
+
+    toast.success(
+      `Download complete! Saved to ${record.albumName}/${fileName}`,
+      {
+        id: toastId,
+        duration: 4000,
+      },
+    );
 
     return { success: true, localUri: result.uri };
   } catch (err: any) {
-    console.error('[Downloader] Error:', err);
-    toast.error(`Download failed: ${err?.message || 'Network error'}`, { id: toastId });
-    return { success: false, error: err?.message || 'Download error' };
+    console.log("[Downloader] downloadMediaItem failed:", {
+      code: err?.code,
+      message: err?.message,
+      status: err?.response?.status,
+      url: getMediaStreamUrl(ip, port, item.id),
+      itemId: item.id,
+      fileName: item.current_relative_path?.split("/").pop(),
+    });
+    console.error("[Downloader] Error:", err);
+    toast.error(`Download failed: ${err?.message || "Network error"}`, {
+      id: toastId,
+    });
+    return { success: false, error: err?.message || "Download error" };
   }
 }
