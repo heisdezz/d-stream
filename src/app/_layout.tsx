@@ -10,6 +10,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner-native';
 import { SplashView } from '@/components/splash/splash-view';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -65,6 +66,7 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <StatusBar style={isDark ? 'light' : 'dark'} />
           <SplashView />
+          <Toaster position="bottom-center" />
           <Stack
             screenOptions={{
               headerStyle: {

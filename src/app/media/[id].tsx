@@ -291,27 +291,41 @@ export default function MediaDetailScreen() {
 
       {/* Primary Download & Action Bar */}
       <View style={styles.downloadBarRow}>
-        <M3Button
-          label={
-            activeDl
-              ? `Downloading... ${activeDl.percentage}%`
-              : downloadedRecord
-              ? 'Downloaded Offline'
-              : `Download ${isVideo ? 'Video' : 'Photo'}`
-          }
-          icon={activeDl ? 'cloud-download' : downloadedRecord ? 'check-circle' : 'file-download'}
-          variant={downloadedRecord ? 'tonal' : 'filled'}
-          loading={!!activeDl}
+        <Pressable
           onPress={handleDownloadPress}
-          style={{ flex: 1, marginRight: Spacing.two }}
-        />
+          style={({ pressed }) => [
+            styles.iconOnlyDownloadBtn,
+            {
+              backgroundColor: downloadedRecord
+                ? colors.secondaryContainer
+                : colors.primary,
+              borderColor: downloadedRecord
+                ? colors.secondary
+                : colors.primary,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          {activeDl ? (
+            <View style={styles.dlProgressIconBox}>
+              <MaterialIcons name="cloud-download" size={22} color={colors.onPrimary} />
+              <Text style={styles.dlPctOverlayText}>{activeDl.percentage}%</Text>
+            </View>
+          ) : (
+            <MaterialIcons
+              name={downloadedRecord ? 'check-circle' : 'file-download'}
+              size={24}
+              color={downloadedRecord ? colors.onSecondaryContainer : colors.onPrimary}
+            />
+          )}
+        </Pressable>
 
         <M3Button
-          label="External"
+          label="Open External"
           icon="open-in-new"
-          variant="outlined"
+          variant="filled"
           onPress={handleOpenExternal}
-          style={{ marginRight: Spacing.two }}
+          style={{ flex: 1, marginRight: Spacing.two }}
         />
 
         <M3Button
@@ -681,6 +695,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.two,
+  },
+  iconOnlyDownloadBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: Shapes.medium,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginRight: Spacing.two,
+  },
+  dlProgressIconBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dlPctOverlayText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#FFF',
+    marginTop: -2,
   },
   dlLocRow: {
     flexDirection: 'row',
