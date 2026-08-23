@@ -8,6 +8,7 @@ import {
   Share,
   useWindowDimensions,
   Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +58,16 @@ export default function MediaDetailScreen() {
   const { width } = useWindowDimensions();
 
   const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
-  const { ip, port, status: syncStatus } = useAppStore();
+  const {
+    ip,
+    port,
+    status: syncStatus,
+    downloadLocation,
+    downloadedItems,
+    activeDownloads,
+    startDownloadMediaItem,
+    removeDownloadedMediaItem,
+  } = useAppStore();
 
   const [item, setItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -77,6 +87,9 @@ export default function MediaDetailScreen() {
   }, [itemId]);
 
   const isVideo = item?.mime_type.startsWith('video/') ?? false;
+  const downloadedRecord = item ? downloadedItems[item.id] : undefined;
+  const activeDl = item ? activeDownloads[item.id] : undefined;
+
   const streamUrl = useMemo(() => {
     if (!item) return '';
     return getMediaStreamUrl(ip, port, item.id);
@@ -87,7 +100,14 @@ export default function MediaDetailScreen() {
     return getThumbnailUrl(ip, port, item.id);
   }, [ip, port, item]);
 
-  const player = useVideoPlayer(isVideo && streamUrl ? streamUrl : null, (p) => {
+  // Use downloaded local URI if offline or available!
+  const playUri = useMemo(() => {
+    if (downloadedRecord?.localUri) return downloadedRecord.localUri;
+    if (syncStatus === 'connected' && streamUrl) return streamUrl;
+    return null;
+  }, [downloadedRecord?.localUri, syncStatus, streamUrl]);
+
+  const player = useVideoPlayer(isVideo && playUri ? playUri : null, (p) => {
     p.loop = false;
   });
 
@@ -100,26 +120,65 @@ export default function MediaDetailScreen() {
     }
   }, [item?.metadata_json]);
 
+  const handleDownloadPress = async () => {
+    if (!item) return;
+    if (downloadedRecord) {
+      Alert.alert(
+        'Downloaded Offline Copy',
+        `File is saved locally in ${downloadedRecord.albumName || 'General'} album folder.\n\nPath: ${downloadedRecord.localUri}`,
+        [
+          { text: 'OK', style: 'cancel' },
+          {
+            text: 'Delete Download',
+            style: 'destructive',
+            onPress: () => removeDownloadedMediaItem(item.id),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (syncStatus !== 'connected') {
+      Alert.alert(
+        'Server Offline',
+        'Connect to your desktop server over LAN to download this media item for offline playback.'
+      );
+      return;
+    }
+
+    const res = await startDownloadMediaItem(item);
+    if (res.success) {
+      Alert.alert(
+        'Download Complete',
+        `Successfully downloaded ${isVideo ? 'video' : 'photo'} for offline playback!\n\nLocation: ${downloadLocation}/${item.album_name || 'General'}`
+      );
+    } else {
+      Alert.alert('Download Failed', res.error || 'Could not save file to disk.');
+    }
+  };
+
   const handleOpenExternal = async () => {
-    if (!streamUrl) return;
+    const targetUrl = downloadedRecord?.localUri || streamUrl;
+    if (!targetUrl) return;
     try {
-      const supported = await Linking.canOpenURL(streamUrl);
+      const supported = await Linking.canOpenURL(targetUrl);
       if (supported) {
-        await Linking.openURL(streamUrl);
+        await Linking.openURL(targetUrl);
       } else {
-        await WebBrowser.openBrowserAsync(streamUrl);
+        await WebBrowser.openBrowserAsync(targetUrl);
       }
     } catch {
-      await WebBrowser.openBrowserAsync(streamUrl);
+      await WebBrowser.openBrowserAsync(targetUrl);
     }
   };
 
   const handleShareLink = async () => {
-    if (!streamUrl) return;
+    const targetUrl = downloadedRecord?.localUri || streamUrl;
+    if (!targetUrl) return;
     try {
       await Share.share({
-        message: `Stream ${item?.current_relative_path}: ${streamUrl}`,
-        url: streamUrl,
+        message: `Media ${item?.current_relative_path}: ${targetUrl}`,
+        url: targetUrl,
       });
     } catch {
       // Ignored
@@ -139,7 +198,7 @@ export default function MediaDetailScreen() {
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ScreenLoader
           message="Loading media inspector..."
-          subMessage="Retrieving file metadata & HTTP 206 stream URL"
+          subMessage="Retrieving file metadata & offline playback status"
           icon="perm-media"
         />
       </View>
@@ -171,7 +230,7 @@ export default function MediaDetailScreen() {
     >
       {/* Hero Media Player / Stage */}
       <View style={[styles.mediaStageContainer, { height: playerHeight, backgroundColor: '#090A0F' }]}>
-        {isVideo ? (
+        {isVideo && playUri ? (
           <VideoView
             player={player}
             style={StyleSheet.absoluteFill}
@@ -180,20 +239,38 @@ export default function MediaDetailScreen() {
             allowsPictureInPicture
             contentFit="contain"
           />
-        ) : (
+        ) : playUri ? (
           <Image
-            source={{ uri: streamUrl || thumbnailUrl }}
+            source={{ uri: playUri }}
             style={StyleSheet.absoluteFill}
             contentFit="contain"
             transition={300}
           />
+        ) : (
+          <View style={styles.centerStageOffline}>
+            <MaterialIcons name="wifi-off" size={48} color={colors.outline} />
+            <Text style={[styles.offlineStageTitle, { color: colors.onSurface }]}>
+              Offline • Connect to LAN to stream
+            </Text>
+            <Text style={[styles.offlineStageSub, { color: colors.onSurfaceVariant }]}>
+              Or download media items when online for offline playback anytime.
+            </Text>
+          </View>
         )}
 
         {/* Floating Top Right Badges */}
         <View style={styles.topRightStageBadges}>
-          <View style={[styles.stageBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+          {downloadedRecord && (
+            <View style={[styles.stageBadge, { backgroundColor: '#10B981' }]}>
+              <MaterialIcons name="offline-pin" size={14} color="#FFF" style={{ marginRight: 2 }} />
+              <Text style={[styles.stageBadgeText, { color: '#FFF' }]}>OFFLINE</Text>
+            </View>
+          )}
+
+          <View style={[styles.stageBadge, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
             <Text style={styles.stageBadgeText}>{extension}</Text>
           </View>
+
           {isVideo && item.duration_seconds && (
             <View style={[styles.stageBadge, { backgroundColor: colors.primary }]}>
               <MaterialIcons name="play-arrow" size={14} color="#FFF" style={{ marginRight: 2 }} />
@@ -204,7 +281,7 @@ export default function MediaDetailScreen() {
           )}
         </View>
 
-        {syncStatus !== 'connected' && (
+        {syncStatus !== 'connected' && !downloadedRecord && (
           <View style={styles.offlineViewerOverlay}>
             <MaterialIcons name="wifi-off" size={18} color="#FFF" style={{ marginRight: 6 }} />
             <Text style={styles.offlineOverlayText}>Offline • LAN Server Unreachable</Text>
@@ -212,21 +289,45 @@ export default function MediaDetailScreen() {
         )}
       </View>
 
-      {/* Floating Action Buttons */}
-      <View style={styles.actionsBar}>
+      {/* Primary Download & Action Bar */}
+      <View style={styles.downloadBarRow}>
         <M3Button
-          label="Open in External Player"
-          icon="open-in-new"
-          variant="filled"
-          onPress={handleOpenExternal}
+          label={
+            activeDl
+              ? `Downloading... ${activeDl.percentage}%`
+              : downloadedRecord
+              ? 'Downloaded Offline'
+              : `Download ${isVideo ? 'Video' : 'Photo'}`
+          }
+          icon={activeDl ? 'cloud-download' : downloadedRecord ? 'check-circle' : 'file-download'}
+          variant={downloadedRecord ? 'tonal' : 'filled'}
+          loading={!!activeDl}
+          onPress={handleDownloadPress}
           style={{ flex: 1, marginRight: Spacing.two }}
         />
+
         <M3Button
-          label="Share Link"
+          label="External"
+          icon="open-in-new"
+          variant="outlined"
+          onPress={handleOpenExternal}
+          style={{ marginRight: Spacing.two }}
+        />
+
+        <M3Button
+          label="Share"
           icon="share"
           variant="outlined"
           onPress={handleShareLink}
         />
+      </View>
+
+      {/* Download Location Subtitle Indicator */}
+      <View style={[styles.dlLocRow, { backgroundColor: colors.surfaceContainer }]}>
+        <MaterialIcons name="folder" size={16} color={colors.primary} style={{ marginRight: 4 }} />
+        <Text style={[styles.dlLocText, { color: colors.onSurfaceVariant }]}>
+          Save folder: <Text style={{ fontWeight: '800', color: colors.onSurface }}>{downloadLocation}/{item.album_name || 'General'}</Text>
+        </Text>
       </View>
 
       {/* Title & Album Details Card */}
@@ -355,6 +456,13 @@ export default function MediaDetailScreen() {
       {/* Tab 1: Overview Specs */}
       {activeTab === 'details' && (
         <M3Card variant="filled" style={styles.specsCard}>
+          <View style={styles.specRow}>
+            <Text style={[styles.specKey, { color: colors.outline }]}>Offline Status</Text>
+            <Text style={[styles.specVal, { color: downloadedRecord ? '#10B981' : colors.onSurface }]}>
+              {downloadedRecord ? 'Downloaded (Playable Offline)' : 'Online Stream Only'}
+            </Text>
+          </View>
+
           <View style={styles.specRow}>
             <Text style={[styles.specKey, { color: colors.outline }]}>File Size</Text>
             <Text style={[styles.specVal, { color: colors.onSurface }]}>
@@ -515,6 +623,22 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     ...Elevation.level3,
   },
+  centerStageOffline: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+  offlineStageTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: Spacing.two,
+  },
+  offlineStageSub: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   topRightStageBadges: {
     position: 'absolute',
     top: 12,
@@ -553,10 +677,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  actionsBar: {
+  downloadBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: Spacing.two,
+  },
+  dlLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Shapes.small,
     marginBottom: Spacing.three,
+  },
+  dlLocText: {
+    fontSize: 12,
   },
   titleCard: {
     marginBottom: Spacing.three,

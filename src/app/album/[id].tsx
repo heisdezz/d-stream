@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import { getAlbumById, getMediaItems } from '@/services/local-db';
 import { getThumbnailUrl } from '@/services/sync-api';
+import { useDebounce } from '@/hooks/use-debounce';
 import { MediaTypeFilter, ViewLayoutMode } from '@/store/atoms';
 import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
 import { M3SearchBar } from '@/components/material/m3-search-bar';
@@ -46,13 +47,19 @@ export default function AlbumGalleryScreen() {
 
   const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize } = useAppStore();
 
-  const [query, setQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedQuery = useDebounce(searchInput, 300);
+
   const [type, setType] = useState<MediaTypeFilter>('all');
   const [sortBy, setSortBy] = useState<'created_at' | 'file_size' | 'current_relative_path'>('created_at');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [layoutMode, setLayoutMode] = useState<ViewLayoutMode>('grid');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(storePageSize || 96);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery]);
 
   // 1. Fetch Album Metadata via TanStack Query
   const { data: album } = useQuery({
@@ -61,18 +68,18 @@ export default function AlbumGalleryScreen() {
     enabled: !isNaN(albumId),
   });
 
-  // 2. Fetch Album Media Items with Pagination via TanStack Query
+  // 2. Fetch Album Media Items with Pagination via TanStack Query (Debounced query)
   const {
     data: mediaData,
     isLoading: mediaLoading,
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['album-media', albumId, page, pageSize, type, query, sortBy, sortOrder],
+    queryKey: ['album-media', albumId, page, pageSize, type, debouncedQuery, sortBy, sortOrder],
     queryFn: () =>
       getMediaItems({
         albumId,
-        query,
+        query: debouncedQuery,
         type,
         sortBy,
         sortOrder,
@@ -195,15 +202,12 @@ export default function AlbumGalleryScreen() {
         </View>
       </View>
 
-      {/* Search & Layout Switcher */}
+      {/* Debounced Search & Layout Switcher */}
       <View style={styles.searchRow}>
         <M3SearchBar
-          value={query}
-          onChangeText={(text) => {
-            setQuery(text);
-            setPage(1);
-          }}
-          placeholder="Filter in this album..."
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder="Filter items in this album..."
           style={{ flex: 1, marginRight: Spacing.two }}
         />
         <Pressable
@@ -310,7 +314,7 @@ export default function AlbumGalleryScreen() {
           <View style={styles.emptyStateBox}>
             <MaterialIcons name="folder-open" size={54} color={colors.outline} />
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-              Album is Empty
+              {debouncedQuery ? 'No matching items in album' : 'Album is Empty'}
             </Text>
             <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
               No media items found matching current filters inside this album.

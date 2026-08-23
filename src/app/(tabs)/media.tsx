@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   View,
   Text,
@@ -51,8 +52,13 @@ export default function MediaExplorerScreen() {
   const { width } = useWindowDimensions();
   const legendListRef = useRef<LegendListRef>(null);
 
-  // Jotai atomic state
   const [query, setQuery] = useAtom(searchQueryAtom);
+  const [searchInput, setSearchInput] = useState(query);
+  const debouncedQuery = useDebounce(searchInput, 300);
+
+  useEffect(() => {
+    setQuery(debouncedQuery);
+  }, [debouncedQuery, setQuery]);
   const [type, setType] = useAtom(mediaTypeFilterAtom);
   const [selectedAlbumId, setSelectedAlbumId] = useAtom(selectedAlbumIdAtom);
   const [selectedTagId, setSelectedTagId] = useAtom(selectedTagIdAtom);
@@ -176,9 +182,9 @@ export default function MediaExplorerScreen() {
       {/* Docked Search & View Toggle Bar */}
       <View style={styles.searchRow}>
         <M3SearchBar
-          value={query}
+          value={searchInput}
           onChangeText={(text) => {
-            setQuery(text);
+            setSearchInput(text);
             setCurrentPage(1);
           }}
           placeholder="Search media by filename or path..."

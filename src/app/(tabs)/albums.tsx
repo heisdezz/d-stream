@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,15 @@ import { useSetAtom } from 'jotai';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import { selectedAlbumIdAtom, selectedTagIdAtom } from '@/store/atoms';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useAlbumsQuery, useTagsQuery } from '@/hooks/use-library-queries';
 import { Spacing, Shapes, MaxContentWidth } from '@/constants/theme';
 import { M3SegmentedRow, SegmentItem } from '@/components/material/m3-segmented-row';
+import { M3SearchBar } from '@/components/material/m3-search-bar';
 import { AlbumCard } from '@/components/media/album-card';
 import { M3Card } from '@/components/material/m3-card';
 import { M3Badge } from '@/components/material/m3-badge';
+import { ScreenLoader } from '@/components/common/screen-loader';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Album, Tag } from '@/types/models';
 
@@ -32,25 +36,33 @@ export default function AlbumsScreen() {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
   const [currentTab, setCurrentTab] = useState<CollectionTab>('albums');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
 
   const setSelectedTagId = useSetAtom(selectedTagIdAtom);
   const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
 
+  const { ip, port, status: syncStatus, stats, hasDatabase } = useAppStore();
+
   const {
-    ip,
-    port,
-    status: syncStatus,
-    albums,
-    tags,
-    stats,
-    hasDatabase,
-    isRefreshing,
-    refreshLibrary,
-  } = useAppStore();
+    data: albumsData = [],
+    isLoading: isAlbumsLoading,
+    refetch: refetchAlbums,
+  } = useAlbumsQuery();
+
+  const {
+    data: tagsData = [],
+    isLoading: isTagsLoading,
+    refetch: refetchTags,
+  } = useTagsQuery();
+
+  const handleRefresh = async () => {
+    await Promise.all([refetchAlbums(), refetchTags()]);
+  };
 
   const handleAlbumPress = (album: Album) => {
-    // Navigate directly to dedicated album gallery page with pagination
     router.push(`/album/${album.id}`);
   };
 
@@ -60,21 +72,58 @@ export default function AlbumsScreen() {
     router.push('/media');
   };
 
-  const tagsByCategory = tags.reduce<Record<string, Tag[]>>((acc, tag) => {
-    const cat = tag.category || 'General';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(tag);
-    return acc;
-  }, {});
+  // Debounced search filtering for albums
+  const filteredAlbums = useMemo(() => {
+    if (!debouncedSearch.trim()) return albumsData;
+    const q = debouncedSearch.toLowerCase().trim();
+    return albumsData.filter(
+      (a) =>
+        a.name.toLowerCase().includes(q) ||
+        (a.relative_path && a.relative_path.toLowerCase().includes(q))
+    );
+  }, [albumsData, debouncedSearch]);
+
+  // Debounced search filtering for tags
+  const filteredTags = useMemo(() => {
+    if (!debouncedSearch.trim()) return tagsData;
+    const q = debouncedSearch.toLowerCase().trim();
+    return tagsData.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.category && t.category.toLowerCase().includes(q))
+    );
+  }, [tagsData, debouncedSearch]);
+
+  const tagsByCategory = useMemo(() => {
+    return filteredTags.reduce<Record<string, Tag[]>>((acc, tag) => {
+      const cat = tag.category || 'General';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(tag);
+      return acc;
+    }, {});
+  }, [filteredTags]);
+
+  const isLoading = isAlbumsLoading || isTagsLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Tab Bar */}
+      {/* Top Controls */}
       <View style={styles.topBar}>
         <M3SegmentedRow
           items={collectionTabs}
           selectedValue={currentTab}
           onSelect={setCurrentTab}
+          style={{ marginBottom: Spacing.two }}
+        />
+
+        <M3SearchBar
+          value={searchInput}
+          onChangeText={setSearchInput}
+          placeholder={
+            currentTab === 'albums'
+              ? 'Filter albums by name or folder path...'
+              : 'Filter tags by category or name...'
+          }
         />
       </View>
 
@@ -86,8 +135,8 @@ export default function AlbumsScreen() {
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refreshLibrary}
+            refreshing={isLoading}
+            onRefresh={handleRefresh}
             colors={[colors.primary]}
             tintColor={colors.primary}
           />
@@ -104,19 +153,25 @@ export default function AlbumsScreen() {
             </Text>
           </M3Card>
         ) : currentTab === 'albums' ? (
-          albums.length === 0 ? (
+          isLoading && albumsData.length === 0 ? (
+            <ScreenLoader
+              message="Loading album collections..."
+              subMessage="Querying local SQLite database"
+              icon="folder-special"
+            />
+          ) : filteredAlbums.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialIcons name="folder-off" size={44} color={colors.outline} />
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                No albums found
+                {debouncedSearch ? 'No matching albums found' : 'No albums found'}
               </Text>
             </View>
           ) : (
             <View>
               <Text style={[styles.sectionHeader, { color: colors.onSurfaceVariant }]}>
-                {albums.length} ALBUMS AVAILABLE
+                {filteredAlbums.length} {filteredAlbums.length === 1 ? 'ALBUM' : 'ALBUMS'} AVAILABLE
               </Text>
-              {albums.map((album) => (
+              {filteredAlbums.map((album) => (
                 <AlbumCard
                   key={album.id}
                   album={album}
@@ -129,11 +184,17 @@ export default function AlbumsScreen() {
           )
         ) : (
           /* Tags View */
-          tags.length === 0 ? (
+          isLoading && tagsData.length === 0 ? (
+            <ScreenLoader
+              message="Loading taxonomy tags..."
+              subMessage="Querying local SQLite database"
+              icon="label"
+            />
+          ) : filteredTags.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialIcons name="label-off" size={44} color={colors.outline} />
               <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-                No tags found
+                {debouncedSearch ? 'No matching tags found' : 'No tags found'}
               </Text>
             </View>
           ) : (

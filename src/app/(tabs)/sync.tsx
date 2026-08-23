@@ -14,7 +14,7 @@ import { pageSizeAtom } from "@/store/atoms";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { useAppStore } from "@/store/use-app-store";
 import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
-import { PAGE_SIZE_OPTIONS } from "@/services/storage";
+import { PAGE_SIZE_OPTIONS, DEFAULT_DOWNLOAD_LOCATION } from "@/services/storage";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Badge } from "@/components/material/m3-badge";
@@ -57,20 +57,28 @@ export default function SyncScreen() {
     latencyMs,
     stats,
     pageSize,
+    downloadLocation,
+    downloadedItems,
     checkConnection,
     syncDatabase,
     updatePageSize,
+    updateDownloadLocation,
     removeHistoryServer,
   } = useAppStore();
 
   const [inputIp, setInputIp] = useState<string>(ip);
   const [inputPort, setInputPort] = useState<string>(port.toString());
+  const [inputDlLocation, setInputDlLocation] = useState<string>(downloadLocation);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   useEffect(() => {
     setInputIp(ip);
     setInputPort(port.toString());
   }, [ip, port]);
+
+  useEffect(() => {
+    setInputDlLocation(downloadLocation);
+  }, [downloadLocation]);
 
   const handleApplyAndTest = async () => {
     const p = parseInt(inputPort, 10) || 8080;
@@ -94,6 +102,18 @@ export default function SyncScreen() {
     }
   };
 
+  const handleSaveDownloadLocation = async () => {
+    const loc = inputDlLocation.trim() || DEFAULT_DOWNLOAD_LOCATION;
+    await updateDownloadLocation(loc);
+    Alert.alert("Storage Path Saved", `Download location updated to: ${loc}`);
+  };
+
+  const handleResetDownloadLocation = async () => {
+    setInputDlLocation(DEFAULT_DOWNLOAD_LOCATION);
+    await updateDownloadLocation(DEFAULT_DOWNLOAD_LOCATION);
+    Alert.alert("Reset to Default", `Download location reset to: ${DEFAULT_DOWNLOAD_LOCATION}`);
+  };
+
   const handleSelectHistoryServer = async (
     histIp: string,
     histPort: number,
@@ -114,6 +134,8 @@ export default function SyncScreen() {
     await updatePageSize(size);
   };
 
+  const downloadedCount = Object.keys(downloadedItems).length;
+
   const faqs = [
     {
       q: "How do I start the sync server on Linux?",
@@ -124,8 +146,8 @@ export default function SyncScreen() {
       a: "Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp",
     },
     {
-      q: "How does live media streaming work?",
-      a: "The mobile app connects to http://<IP>:8080/media/<id> to stream full-res video with HTTP 206 Range seeking support and http://<IP>:8080/thumbnail/<id> for fast JPEG thumbnails.",
+      q: "How does offline video downloading work?",
+      a: "Tap the Download button on any video or photo detail screen. Files are saved locally to your configured download location inside album subfolders, allowing complete offline playback when disconnected from the LAN server.",
     },
     {
       q: "How does database snapshot sync work?",
@@ -371,6 +393,65 @@ export default function SyncScreen() {
             loading={status === "downloading" || status === "migrating"}
             onPress={handleSyncPress}
             style={{ flex: 1 }}
+          />
+        </View>
+      </M3Card>
+
+      {/* Media Download & Offline Location Card */}
+      <M3Card variant="elevated" style={styles.configCard}>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="folder-zip" size={22} color={colors.primary} />
+          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+            Offline Media Storage
+          </Text>
+          <M3Badge
+            label={`${downloadedCount} saved`}
+            variant={downloadedCount > 0 ? "secondary" : "surface"}
+            size="small"
+            style={{ marginLeft: "auto" }}
+          />
+        </View>
+
+        <Text style={[styles.prefDesc, { color: colors.onSurfaceVariant, marginBottom: Spacing.two }]}>
+          Specify folder path for offline video and photo downloads. Downloaded items are automatically stored inside album subfolders (e.g. <Text style={{ fontWeight: '800' }}>Movies/d-stream/&lt;AlbumName&gt;/</Text>) for offline playback.
+        </Text>
+
+        <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
+          Storage Location Path
+        </Text>
+        <View
+          style={[
+            styles.inputBox,
+            {
+              backgroundColor: colors.surfaceContainerHighest,
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+        >
+          <TextInput
+            value={inputDlLocation}
+            onChangeText={setInputDlLocation}
+            placeholder="Movies/d-stream"
+            placeholderTextColor={colors.outline}
+            style={[styles.input, { color: colors.onSurface }]}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.buttonRow}>
+          <M3Button
+            label="Save Location"
+            icon="save"
+            variant="filled"
+            onPress={handleSaveDownloadLocation}
+            style={{ flex: 1, marginRight: Spacing.two }}
+          />
+          <M3Button
+            label="Reset Default"
+            icon="restore"
+            variant="outlined"
+            onPress={handleResetDownloadLocation}
           />
         </View>
       </M3Card>

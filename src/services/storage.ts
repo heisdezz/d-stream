@@ -8,6 +8,17 @@ export const DEFAULT_PAGE_SIZE = 96;
 export const MIN_PAGE_SIZE = 24;
 export const MAX_PAGE_SIZE = 180;
 export const PAGE_SIZE_OPTIONS = [24, 48, 72, 96, 120, 144, 168, 180];
+export const DEFAULT_DOWNLOAD_LOCATION = 'Movies/d-stream';
+
+export interface DownloadedItemRecord {
+  mediaId: number;
+  localUri: string;
+  albumName: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  downloadedAt: string;
+}
 
 interface AppStorageData {
   serverIp: string;
@@ -16,6 +27,8 @@ interface AppStorageData {
   lastSyncTime: string | null;
   viewMode: 'grid' | 'list';
   pageSize: number;
+  downloadLocation: string;
+  downloadedItems: Record<number, DownloadedItemRecord>;
 }
 
 const defaultData: AppStorageData = {
@@ -25,6 +38,8 @@ const defaultData: AppStorageData = {
   lastSyncTime: null,
   viewMode: 'grid',
   pageSize: DEFAULT_PAGE_SIZE,
+  downloadLocation: DEFAULT_DOWNLOAD_LOCATION,
+  downloadedItems: {},
 };
 
 let memoryCache: AppStorageData = { ...defaultData };
@@ -141,4 +156,39 @@ export async function savePageSize(size: number): Promise<void> {
   const data = await loadDataFromDisk();
   data.pageSize = clamped;
   await saveDataToDisk();
+}
+
+export async function getSavedDownloadLocation(): Promise<string> {
+  const data = await loadDataFromDisk();
+  return data.downloadLocation || DEFAULT_DOWNLOAD_LOCATION;
+}
+
+export async function saveDownloadLocation(location: string): Promise<void> {
+  const data = await loadDataFromDisk();
+  data.downloadLocation = location.trim() || DEFAULT_DOWNLOAD_LOCATION;
+  await saveDataToDisk();
+}
+
+export async function getDownloadedItemsMap(): Promise<Record<number, DownloadedItemRecord>> {
+  const data = await loadDataFromDisk();
+  return data.downloadedItems || {};
+}
+
+export async function saveDownloadedItemRecord(record: DownloadedItemRecord): Promise<Record<number, DownloadedItemRecord>> {
+  const data = await loadDataFromDisk();
+  if (!data.downloadedItems) {
+    data.downloadedItems = {};
+  }
+  data.downloadedItems[record.mediaId] = record;
+  await saveDataToDisk();
+  return data.downloadedItems;
+}
+
+export async function removeDownloadedItemRecord(mediaId: number): Promise<Record<number, DownloadedItemRecord>> {
+  const data = await loadDataFromDisk();
+  if (data.downloadedItems && data.downloadedItems[mediaId]) {
+    delete data.downloadedItems[mediaId];
+    await saveDataToDisk();
+  }
+  return data.downloadedItems || {};
 }

@@ -13,6 +13,7 @@ import {
   DEFAULT_SERVER_IP,
   DEFAULT_SERVER_PORT,
   DEFAULT_PAGE_SIZE,
+  DEFAULT_DOWNLOAD_LOCATION,
   getSavedServerConfig,
   getServerHistory,
   getLastSyncTime,
@@ -21,6 +22,12 @@ import {
   removeServerFromHistory,
   getSavedPageSize,
   savePageSize,
+  getSavedDownloadLocation,
+  saveDownloadLocation,
+  getDownloadedItemsMap,
+  saveDownloadedItemRecord,
+  removeDownloadedItemRecord,
+  DownloadedItemRecord,
 } from '@/services/storage';
 import {
   testServerConnection,
@@ -37,6 +44,7 @@ import {
   getMediaItems,
   isDatabaseAvailable,
 } from '@/services/local-db';
+import { downloadMediaItem, DownloadProgress } from '@/services/downloader';
 
 interface FetchPageOptions {
   query?: string;
@@ -61,6 +69,11 @@ interface AppState {
   lastSyncTime: string | null;
   latencyMs: number | null;
 
+  // Downloads & Offline Store State
+  downloadLocation: string;
+  downloadedItems: Record<number, DownloadedItemRecord>;
+  activeDownloads: Record<number, DownloadProgress>;
+
   // Library State
   stats: LibraryStats;
   hasDatabase: boolean;
@@ -83,6 +96,9 @@ interface AppState {
   refreshLibrary: () => Promise<void>;
   fetchMediaPage: (options?: FetchPageOptions) => Promise<void>;
   updatePageSize: (size: number) => Promise<void>;
+  updateDownloadLocation: (location: string) => Promise<void>;
+  startDownloadMediaItem: (item: MediaItem) => Promise<{ success: boolean; error?: string }>;
+  removeDownloadedMediaItem: (mediaId: number) => Promise<void>;
   removeHistoryServer: (delIp: string, delPort: number) => Promise<void>;
 }
 
@@ -96,6 +112,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncProgress: null,
   lastSyncTime: null,
   latencyMs: null,
+
+  downloadLocation: DEFAULT_DOWNLOAD_LOCATION,
+  downloadedItems: {},
+  activeDownloads: {},
 
   stats: {
     total_items: 0,
@@ -124,6 +144,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const history = await getServerHistory();
       const lastSync = await getLastSyncTime();
       const savedPageSize = await getSavedPageSize();
+      const savedDlLocation = await getSavedDownloadLocation();
+      const savedDlMap = await getDownloadedItemsMap();
 
       set({
         ip: config.ip,
@@ -131,6 +153,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         serverHistory: history,
         lastSyncTime: lastSync,
         pageSize: savedPageSize,
+        downloadLocation: savedDlLocation,
+        downloadedItems: savedDlMap,
       });
 
       await Promise.all([
@@ -329,6 +353,55 @@ export const useAppStore = create<AppState>((set, get) => ({
   updatePageSize: async (size: number) => {
     await savePageSize(size);
     set({ pageSize: size, currentPage: 1 });
+  },
+
+  updateDownloadLocation: async (location: string) => {
+    await saveDownloadLocation(location);
+    set({ downloadLocation: location });
+  },
+
+  startDownloadMediaItem: async (item: MediaItem) => {
+    const { ip, port } = get();
+
+    set((state) => ({
+      activeDownloads: {
+        ...state.activeDownloads,
+        [item.id]: {
+          mediaId: item.id,
+          totalBytesWritten: 0,
+          totalBytesExpectedToWrite: item.file_size || 1,
+          percentage: 0,
+        },
+      },
+    }));
+
+    const result = await downloadMediaItem(item, ip, port, (progress) => {
+      set((state) => ({
+        activeDownloads: {
+          ...state.activeDownloads,
+          [item.id]: progress,
+        },
+      }));
+    });
+
+    set((state) => {
+      const nextActive = { ...state.activeDownloads };
+      delete nextActive[item.id];
+      return { activeDownloads: nextActive };
+    });
+
+    if (result.success) {
+      const updatedMap = await getDownloadedItemsMap();
+      set({ downloadedItems: updatedMap });
+      return { success: true };
+    } else {
+      return { success: false, error: result.error };
+    }
+  },
+
+  removeDownloadedMediaItem: async (mediaId: number) => {
+    const updatedMap = await removeDownloadedItemRecord(mediaId);
+    set({ downloadedItems: updatedMap });
   },
 
   removeHistoryServer: async (delIp: string, delPort: number) => {
