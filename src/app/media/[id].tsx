@@ -80,12 +80,30 @@ export default function MediaDetailScreen() {
     async function loadItem() {
       if (isNaN(itemId)) return;
       setLoading(true);
-      const res = await getMediaItemById(itemId);
+      let res = await getMediaItemById(itemId);
+      if (!res) {
+        const dlRecord = downloadedItems[itemId];
+        if (dlRecord) {
+          res = {
+            id: dlRecord.mediaId,
+            file_hash: '',
+            original_relative_path: dlRecord.fileName,
+            current_relative_path: dlRecord.fileName,
+            file_size: dlRecord.fileSize,
+            mime_type: dlRecord.mimeType,
+            duration_seconds: null,
+            metadata_json: null,
+            album_id: null,
+            album_name: dlRecord.albumName,
+            created_at: dlRecord.downloadedAt,
+          };
+        }
+      }
       setItem(res);
       setLoading(false);
     }
     loadItem();
-  }, [itemId]);
+  }, [itemId, downloadedItems]);
 
   const isVideo = item?.mime_type.startsWith('video/') ?? false;
   const downloadedRecord = item ? downloadedItems[item.id] : undefined;
@@ -248,23 +266,50 @@ export default function MediaDetailScreen() {
             <Text style={[styles.offlineStageTitle, { color: colors.onSurface }]}>
               Offline • Connect to LAN to stream
             </Text>
-            <Text style={[styles.offlineStageSub, { color: colors.onSurfaceVariant }]}>
-              Or download media items when online for offline playback anytime.
+            <Text style={[styles.offlineStageSubtitle, { color: colors.outline }]}>
+              Download this file when connected to play anytime
             </Text>
           </View>
         )}
 
-        {/* Floating Top Right Badges */}
-        <View style={styles.topRightStageBadges}>
-          {downloadedRecord && (
-            <View style={[styles.stageBadge, { backgroundColor: '#10B981' }]}>
-              <MaterialIcons name="offline-pin" size={14} color="#FFF" style={{ marginRight: 2 }} />
-              <Text style={[styles.stageBadgeText, { color: '#FFF' }]}>OFFLINE</Text>
-            </View>
-          )}
-
-          <View style={[styles.stageBadge, { backgroundColor: 'rgba(0,0,0,0.75)' }]}>
-            <Text style={styles.stageBadgeText}>{extension}</Text>
+        {/* Floating Badges */}
+        <View style={styles.stageFloatingBadges}>
+          <View
+            style={[
+              styles.stageBadge,
+              {
+                backgroundColor: downloadedRecord
+                  ? '#10B981'
+                  : syncStatus === 'connected'
+                  ? colors.primaryContainer
+                  : colors.errorContainer,
+              },
+            ]}
+          >
+            <MaterialIcons
+              name={
+                downloadedRecord
+                  ? 'offline-pin'
+                  : syncStatus === 'connected'
+                  ? 'cloud-done'
+                  : 'cloud-off'
+              }
+              size={14}
+              color={downloadedRecord ? '#FFF' : colors.onPrimaryContainer}
+              style={{ marginRight: 4 }}
+            />
+            <Text
+              style={[
+                styles.stageBadgeText,
+                { color: downloadedRecord ? '#FFF' : colors.onPrimaryContainer },
+              ]}
+            >
+              {downloadedRecord
+                ? 'OFFLINE READY'
+                : syncStatus === 'connected'
+                ? 'ONLINE STREAM'
+                : 'OFFLINE'}
+            </Text>
           </View>
 
           {isVideo && item.duration_seconds && (
@@ -348,114 +393,98 @@ export default function MediaDetailScreen() {
           </Text>
           <M3Badge
             label={isVideo ? 'VIDEO' : 'PHOTO'}
-            variant={isVideo ? 'primary' : 'secondary'}
-            size="medium"
+            variant={isVideo ? 'tertiary' : 'primary'}
+            size="small"
           />
         </View>
 
-        <Text style={[styles.fullPath, { color: colors.onSurfaceVariant }]}>
-          {item.current_relative_path}
-        </Text>
-
         {item.album_name && (
-          <Pressable onPress={handleJumpToAlbum} style={styles.albumLinkRow}>
-            <View style={[styles.folderIconBadge, { backgroundColor: colors.primaryContainer }]}>
-              <MaterialIcons name="folder-special" size={18} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.albumLabelSub, { color: colors.outline }]}>Album Collection</Text>
-              <Text style={[styles.albumLinkTitle, { color: colors.onSurface }]}>
-                {item.album_name}
-              </Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={colors.primary} />
+          <Pressable
+            onPress={handleJumpToAlbum}
+            style={({ pressed }) => [
+              styles.albumLinkRow,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <MaterialIcons name="folder-special" size={18} color={colors.primary} style={{ marginRight: 6 }} />
+            <Text style={[styles.albumLinkText, { color: colors.primary }]}>
+              {item.album_name}
+            </Text>
+            <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
           </Pressable>
         )}
+
+        <View style={styles.quickMetaRow}>
+          <View style={styles.quickMetaPill}>
+            <MaterialIcons name="sd-storage" size={14} color={colors.outline} style={{ marginRight: 4 }} />
+            <Text style={[styles.quickMetaText, { color: colors.onSurfaceVariant }]}>
+              {formatBytes(item.file_size)}
+            </Text>
+          </View>
+
+          <View style={styles.quickMetaPill}>
+            <MaterialIcons name="extension" size={14} color={colors.outline} style={{ marginRight: 4 }} />
+            <Text style={[styles.quickMetaText, { color: colors.onSurfaceVariant }]}>
+              {extension}
+            </Text>
+          </View>
+
+          <View style={styles.quickMetaPill}>
+            <MaterialIcons name="event" size={14} color={colors.outline} style={{ marginRight: 4 }} />
+            <Text style={[styles.quickMetaText, { color: colors.onSurfaceVariant }]}>
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </View>
+        </View>
       </M3Card>
 
-      {/* Segmented Specs Tabs */}
-      <View style={[styles.tabHeaderRow, { backgroundColor: colors.surfaceContainerHigh }]}>
+      {/* Detail Tabs */}
+      <View style={styles.tabHeaderRow}>
         <Pressable
           onPress={() => setActiveTab('details')}
           style={[
-            styles.tabBtn,
-            activeTab === 'details' && {
-              backgroundColor: colors.surfaceContainerLowest,
-              ...Elevation.level1,
-            },
+            styles.tabItem,
+            activeTab === 'details' && { borderBottomColor: colors.primary, borderBottomWidth: 3 },
           ]}
         >
-          <MaterialIcons
-            name="info-outline"
-            size={16}
-            color={activeTab === 'details' ? colors.primary : colors.outline}
-            style={{ marginRight: 4 }}
-          />
           <Text
             style={[
-              styles.tabBtnText,
-              {
-                color: activeTab === 'details' ? colors.onSurface : colors.onSurfaceVariant,
-                fontWeight: activeTab === 'details' ? '800' : '600',
-              },
+              styles.tabItemText,
+              { color: activeTab === 'details' ? colors.primary : colors.outline },
             ]}
           >
-            Overview
+            File Details
           </Text>
         </Pressable>
 
         <Pressable
           onPress={() => setActiveTab('exif')}
           style={[
-            styles.tabBtn,
-            activeTab === 'exif' && {
-              backgroundColor: colors.surfaceContainerLowest,
-              ...Elevation.level1,
-            },
+            styles.tabItem,
+            activeTab === 'exif' && { borderBottomColor: colors.primary, borderBottomWidth: 3 },
           ]}
         >
-          <MaterialIcons
-            name="tune"
-            size={16}
-            color={activeTab === 'exif' ? colors.primary : colors.outline}
-            style={{ marginRight: 4 }}
-          />
           <Text
             style={[
-              styles.tabBtnText,
-              {
-                color: activeTab === 'exif' ? colors.onSurface : colors.onSurfaceVariant,
-                fontWeight: activeTab === 'exif' ? '800' : '600',
-              },
+              styles.tabItemText,
+              { color: activeTab === 'exif' ? colors.primary : colors.outline },
             ]}
           >
-            Specs & EXIF
+            EXIF & Codec
           </Text>
         </Pressable>
 
         <Pressable
           onPress={() => setActiveTab('tags')}
           style={[
-            styles.tabBtn,
-            activeTab === 'tags' && {
-              backgroundColor: colors.surfaceContainerLowest,
-              ...Elevation.level1,
-            },
+            styles.tabItem,
+            activeTab === 'tags' && { borderBottomColor: colors.primary, borderBottomWidth: 3 },
           ]}
         >
-          <MaterialIcons
-            name="label-outline"
-            size={16}
-            color={activeTab === 'tags' ? colors.primary : colors.outline}
-            style={{ marginRight: 4 }}
-          />
           <Text
             style={[
-              styles.tabBtnText,
-              {
-                color: activeTab === 'tags' ? colors.onSurface : colors.onSurfaceVariant,
-                fontWeight: activeTab === 'tags' ? '800' : '600',
-              },
+              styles.tabItemText,
+              { color: activeTab === 'tags' ? colors.primary : colors.outline },
             ]}
           >
             Tags ({item.tags?.length || 0})
@@ -463,142 +492,130 @@ export default function MediaDetailScreen() {
         </Pressable>
       </View>
 
-      {/* Tab 1: Overview Specs */}
+      {/* Tab 1: File Details */}
       {activeTab === 'details' && (
-        <M3Card variant="filled" style={styles.specsCard}>
-          <View style={styles.specRow}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>Offline Status</Text>
-            <Text style={[styles.specVal, { color: downloadedRecord ? '#10B981' : colors.onSurface }]}>
-              {downloadedRecord ? 'Downloaded (Playable Offline)' : 'Online Stream Only'}
-            </Text>
-          </View>
-
-          <View style={styles.specRow}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>File Size</Text>
-            <Text style={[styles.specVal, { color: colors.onSurface }]}>
-              {formatBytes(item.file_size)} ({item.file_size.toLocaleString()} B)
-            </Text>
-          </View>
-
-          <View style={styles.specRow}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>MIME Type</Text>
-            <Text style={[styles.specVal, { color: colors.onSurface }]}>{item.mime_type}</Text>
-          </View>
-
-          {isVideo && (
-            <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Duration</Text>
-              <Text style={[styles.specVal, { color: colors.onSurface }]}>
-                {formatDuration(item.duration_seconds)}
-              </Text>
-            </View>
+        <M3Card variant="outlined" style={styles.tabContentCard}>
+          <DetailRow label="File Path" value={item.current_relative_path} colors={colors} />
+          <DetailRow label="Original Path" value={item.original_relative_path} colors={colors} />
+          <DetailRow label="MIME Type" value={item.mime_type} colors={colors} />
+          <DetailRow label="File Size" value={`${formatBytes(item.file_size)} (${item.file_size.toLocaleString()} bytes)`} colors={colors} />
+          {item.duration_seconds && (
+            <DetailRow label="Duration" value={formatDuration(item.duration_seconds)} colors={colors} />
           )}
-
-          <View style={styles.specRow}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>Indexed Date</Text>
-            <Text style={[styles.specVal, { color: colors.onSurface }]}>
-              {new Date(item.created_at).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={[styles.specRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.specKey, { color: colors.outline }]}>Relative Path</Text>
-            <Text style={[styles.specVal, { color: colors.onSurface }]} numberOfLines={2}>
-              {item.original_relative_path}
-            </Text>
-          </View>
+          <DetailRow label="Imported Date" value={new Date(item.created_at).toLocaleString()} colors={colors} />
+          {downloadedRecord && (
+            <>
+              <DetailRow label="Offline Local Path" value={downloadedRecord.localUri} colors={colors} />
+              <DetailRow label="Downloaded On" value={new Date(downloadedRecord.downloadedAt).toLocaleString()} colors={colors} />
+            </>
+          )}
         </M3Card>
       )}
 
-      {/* Tab 2: Technical Specs & EXIF */}
+      {/* Tab 2: EXIF & Codec */}
       {activeTab === 'exif' && (
-        <M3Card variant="filled" style={styles.specsCard}>
-          {parsedMetadata.width && parsedMetadata.height ? (
-            <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Resolution</Text>
-              <Text style={[styles.specVal, { color: colors.onSurface }]}>
-                {parsedMetadata.width} × {parsedMetadata.height} px
+        <M3Card variant="outlined" style={styles.tabContentCard}>
+          {Object.keys(parsedMetadata).length === 0 ? (
+            <View style={styles.noMetaBox}>
+              <MaterialIcons name="info-outline" size={36} color={colors.outline} />
+              <Text style={[styles.noMetaText, { color: colors.outline }]}>
+                No embedded EXIF or video stream metadata found for this item.
               </Text>
             </View>
-          ) : null}
-
-          {parsedMetadata.codec ? (
-            <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Video Codec</Text>
-              <Text style={[styles.specVal, { color: colors.onSurface }]}>{parsedMetadata.codec}</Text>
-            </View>
-          ) : null}
-
-          {parsedMetadata.camera_make || parsedMetadata.camera_model ? (
-            <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Camera Model</Text>
-              <Text style={[styles.specVal, { color: colors.onSurface }]}>
-                {[parsedMetadata.camera_make, parsedMetadata.camera_model].filter(Boolean).join(' ')}
-              </Text>
-            </View>
-          ) : null}
-
-          {parsedMetadata.date_taken ? (
-            <View style={styles.specRow}>
-              <Text style={[styles.specKey, { color: colors.outline }]}>Captured Date</Text>
-              <Text style={[styles.specVal, { color: colors.onSurface }]}>
-                {parsedMetadata.date_taken}
-              </Text>
-            </View>
-          ) : null}
-
-          {/* SHA-256 Checksum Hash */}
-          <View style={[styles.specRow, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
-            <Text style={[styles.specKey, { color: colors.outline, marginBottom: 4 }]}>SHA-256 Checksum Hash</Text>
-            <Text
-              style={[
-                styles.hashValBox,
-                {
-                  color: colors.primary,
-                  backgroundColor: colors.surfaceContainerHigh,
-                  borderColor: colors.outlineVariant,
-                },
-              ]}
-              selectable
-            >
-              {item.file_hash}
-            </Text>
-          </View>
+          ) : (
+            <>
+              {parsedMetadata.width && parsedMetadata.height && (
+                <DetailRow
+                  label="Dimensions"
+                  value={`${parsedMetadata.width} × ${parsedMetadata.height} px`}
+                  colors={colors}
+                />
+              )}
+              {parsedMetadata.codec && (
+                <DetailRow label="Video Codec" value={parsedMetadata.codec} colors={colors} />
+              )}
+              {parsedMetadata.fps && (
+                <DetailRow label="Frame Rate" value={`${parsedMetadata.fps} fps`} colors={colors} />
+              )}
+              {parsedMetadata.bitrate && (
+                <DetailRow
+                  label="Bitrate"
+                  value={`${Math.round(parsedMetadata.bitrate / 1000)} kbps`}
+                  colors={colors}
+                />
+              )}
+              {parsedMetadata.camera_make && (
+                <DetailRow label="Camera Make" value={parsedMetadata.camera_make} colors={colors} />
+              )}
+              {parsedMetadata.camera_model && (
+                <DetailRow label="Camera Model" value={parsedMetadata.camera_model} colors={colors} />
+              )}
+              {parsedMetadata.date_taken && (
+                <DetailRow label="Date Taken" value={parsedMetadata.date_taken} colors={colors} />
+              )}
+              {parsedMetadata.iso && (
+                <DetailRow label="ISO" value={`ISO ${parsedMetadata.iso}`} colors={colors} />
+              )}
+              {parsedMetadata.f_number && (
+                <DetailRow label="Aperture" value={`f/${parsedMetadata.f_number}`} colors={colors} />
+              )}
+              {parsedMetadata.exposure_time && (
+                <DetailRow label="Exposure" value={`${parsedMetadata.exposure_time} s`} colors={colors} />
+              )}
+              {parsedMetadata.latitude && parsedMetadata.longitude && (
+                <DetailRow
+                  label="GPS Coordinates"
+                  value={`${parsedMetadata.latitude.toFixed(5)}, ${parsedMetadata.longitude.toFixed(5)}`}
+                  colors={colors}
+                />
+              )}
+            </>
+          )}
         </M3Card>
       )}
 
       {/* Tab 3: Tags */}
       {activeTab === 'tags' && (
-        <M3Card variant="filled" style={styles.specsCard}>
-          {item.tags && item.tags.length > 0 ? (
-            <View style={styles.tagsCloud}>
-              {item.tags.map((tag) => (
-                <View
-                  key={tag.id}
-                  style={[
-                    styles.tagBadgePill,
-                    {
-                      backgroundColor: colors.surfaceContainer,
-                      borderColor: tag.color_hex || colors.primary,
-                    },
-                  ]}
-                >
-                  <View style={[styles.tagDot, { backgroundColor: tag.color_hex || colors.primary }]} />
-                  <Text style={[styles.tagText, { color: colors.onSurface }]}>{tag.name}</Text>
-                </View>
-              ))}
+        <M3Card variant="outlined" style={styles.tabContentCard}>
+          {(!item.tags || item.tags.length === 0) ? (
+            <View style={styles.noMetaBox}>
+              <MaterialIcons name="label-off" size={36} color={colors.outline} />
+              <Text style={[styles.noMetaText, { color: colors.outline }]}>
+                No taxonomy tags associated with this media item.
+              </Text>
             </View>
           ) : (
-            <View style={styles.emptyTagsBox}>
-              <MaterialIcons name="label-off" size={32} color={colors.outline} />
-              <Text style={[styles.noTagsText, { color: colors.outline }]}>
-                No taxonomy tags assigned to this media item.
-              </Text>
+            <View style={styles.tagsPillContainer}>
+              {item.tags.map((t) => (
+                <View
+                  key={t.id}
+                  style={[
+                    styles.tagBadge,
+                    { backgroundColor: (t.color_hex || colors.primary) + '22', borderColor: t.color_hex || colors.primary },
+                  ]}
+                >
+                  <MaterialIcons name="label" size={14} color={t.color_hex || colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={[styles.tagBadgeText, { color: t.color_hex || colors.primary }]}>
+                    {t.name} ({t.category})
+                  </Text>
+                </View>
+              ))}
             </View>
           )}
         </M3Card>
       )}
     </ScrollView>
+  );
+}
+
+function DetailRow({ label, value, colors }: { label: string; value: string; colors: any }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={[styles.detailLabel, { color: colors.outline }]}>{label}</Text>
+      <Text style={[styles.detailValue, { color: colors.onSurface }]} selectable>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -608,9 +625,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: Spacing.four,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
   },
   center: {
     flex: 1,
@@ -619,19 +633,17 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   errorTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    marginTop: Spacing.two,
+    marginTop: Spacing.three,
   },
   mediaStageContainer: {
     width: '100%',
     borderRadius: Shapes.large,
     overflow: 'hidden',
-    marginBottom: Spacing.three,
     position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    ...Elevation.level3,
+    marginBottom: Spacing.four,
+    ...Elevation.level2,
   },
   centerStageOffline: {
     flex: 1,
@@ -640,52 +652,48 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   offlineStageTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     marginTop: Spacing.two,
   },
-  offlineStageSub: {
-    fontSize: 12,
-    textAlign: 'center',
+  offlineStageSubtitle: {
+    fontSize: 13,
     marginTop: 4,
+    textAlign: 'center',
   },
-  topRightStageBadges: {
+  stageFloatingBadges: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: Spacing.two,
+    right: Spacing.two,
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    gap: Spacing.one,
   },
   stageBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: Shapes.small,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Shapes.full,
   },
   stageBadgeText: {
-    color: '#FFF',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.4,
   },
   offlineViewerOverlay: {
     position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Shapes.medium,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
   offlineOverlayText: {
     color: '#FFF',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   downloadBarRow: {
     flexDirection: 'row',
@@ -695,7 +703,7 @@ const styles = StyleSheet.create({
   iconOnlyDownloadBtn: {
     width: 48,
     height: 48,
-    borderRadius: Shapes.medium,
+    borderRadius: Shapes.full,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -706,7 +714,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dlPctOverlayText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '900',
     color: '#FFF',
     marginTop: -2,
@@ -715,138 +723,113 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.one,
     borderRadius: Shapes.small,
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.four,
   },
   dlLocText: {
     fontSize: 12,
   },
   titleCard: {
-    marginBottom: Spacing.three,
+    padding: Spacing.four,
+    marginBottom: Spacing.four,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    marginBottom: Spacing.two,
   },
   fileName: {
     fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: -0.4,
+    fontWeight: '800',
     flex: 1,
     marginRight: Spacing.two,
-  },
-  fullPath: {
-    fontSize: 12,
-    marginTop: 6,
-    lineHeight: 17,
   },
   albumLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.three,
-    paddingTop: Spacing.two + 2,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(150,150,150,0.12)',
-  },
-  folderIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: Shapes.small,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.two,
-  },
-  albumLabelSub: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  albumLinkTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  tabHeaderRow: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: Shapes.medium,
-    marginBottom: Spacing.three,
-    gap: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: Shapes.small,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabBtnText: {
-    fontSize: 12,
-  },
-  specsCard: {
     marginBottom: Spacing.three,
   },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(150,150,150,0.12)',
+  albumLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
-  specKey: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  specVal: {
-    fontSize: 13,
-    fontWeight: '800',
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: Spacing.two,
-  },
-  hashValBox: {
-    width: '100%',
-    fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    padding: Spacing.two,
-    borderRadius: Shapes.small,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  tagsCloud: {
+  quickMetaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
-    paddingVertical: Spacing.one,
   },
-  tagBadgePill: {
+  quickMetaPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Shapes.small,
+    backgroundColor: 'rgba(150,150,150,0.1)',
+  },
+  quickMetaText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tabHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+    marginBottom: Spacing.four,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    borderBottomWidth: 0,
+  },
+  tabItemText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  tabContentCard: {
+    padding: Spacing.four,
+  },
+  detailRow: {
+    marginBottom: Spacing.three,
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  noMetaBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.six,
+  },
+  noMetaText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: Spacing.two,
+  },
+  tagsPillContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  tagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: Shapes.full,
     borderWidth: 1,
   },
-  tagDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  tagText: {
-    fontSize: 13,
+  tagBadgeText: {
+    fontSize: 12,
     fontWeight: '700',
-  },
-  emptyTagsBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.four,
-  },
-  noTagsText: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: Spacing.one,
   },
 });

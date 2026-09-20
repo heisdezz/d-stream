@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import {
   Album,
   LibraryStats,
@@ -8,7 +8,7 @@ import {
   SyncProgress,
   SyncStatus,
   Tag,
-} from '@/types/models';
+} from "@/types/models";
 import {
   DEFAULT_SERVER_IP,
   DEFAULT_SERVER_PORT,
@@ -28,12 +28,12 @@ import {
   saveDownloadedItemRecord,
   removeDownloadedItemRecord,
   DownloadedItemRecord,
-} from '@/services/storage';
+} from "@/services/storage";
 import {
   testServerConnection,
   fetchServerInfo,
   downloadDatabaseSnapshot,
-} from '@/services/sync-api';
+} from "@/services/sync-api";
 import {
   getNewSnapshotDownloadPath,
   importDownloadedSnapshot,
@@ -43,16 +43,20 @@ import {
   getRecentMedia,
   getMediaItems,
   isDatabaseAvailable,
-} from '@/services/local-db';
-import { downloadMediaItem, DownloadProgress } from '@/services/downloader';
+} from "@/services/local-db";
+import {
+  downloadMediaItem,
+  deleteDownloadedFile,
+  DownloadProgress,
+} from "@/services/downloader";
 
 interface FetchPageOptions {
   query?: string;
-  type?: 'all' | 'image' | 'video';
+  type?: "all" | "image" | "video";
   albumId?: number;
   tagId?: number;
-  sortBy?: 'created_at' | 'file_size' | 'current_relative_path';
-  sortOrder?: 'ASC' | 'DESC';
+  sortBy?: "created_at" | "file_size" | "current_relative_path";
+  sortOrder?: "ASC" | "DESC";
   page?: number;
   pageSize?: number;
 }
@@ -92,12 +96,18 @@ interface AppState {
   setIp: (ip: string) => void;
   setPort: (port: number) => void;
   checkConnection: (targetIp?: string, targetPort?: number) => Promise<void>;
-  syncDatabase: (targetIp?: string, targetPort?: number) => Promise<{ success: boolean; error?: string }>;
+  syncDatabase: (
+    targetIp?: string,
+    targetPort?: number,
+  ) => Promise<{ success: boolean; error?: string }>;
   refreshLibrary: () => Promise<void>;
   fetchMediaPage: (options?: FetchPageOptions) => Promise<void>;
   updatePageSize: (size: number) => Promise<void>;
   updateDownloadLocation: (location: string) => Promise<void>;
-  startDownloadMediaItem: (item: MediaItem) => Promise<{ success: boolean; error?: string }>;
+  refreshDownloadedItems: () => Promise<void>;
+  startDownloadMediaItem: (
+    item: MediaItem,
+  ) => Promise<{ success: boolean; error?: string }>;
   removeDownloadedMediaItem: (mediaId: number) => Promise<void>;
   removeHistoryServer: (delIp: string, delPort: number) => Promise<void>;
 }
@@ -107,7 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   port: DEFAULT_SERVER_PORT,
   serverHistory: [],
   serverInfo: null,
-  status: 'idle',
+  status: "idle",
   errorMessage: null,
   syncProgress: null,
   lastSyncTime: null,
@@ -124,7 +134,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     albums: 0,
     tags: 0,
     db_size_bytes: 0,
-    db_size_formatted: '0 B',
+    db_size_formatted: "0 B",
     db_exists: false,
   },
   hasDatabase: false,
@@ -154,7 +164,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastSyncTime: lastSync,
         pageSize: savedPageSize,
         downloadLocation: savedDlLocation,
-        downloadedItems: savedDlMap,
+        downloadedItems: { ...savedDlMap },
       });
 
       await Promise.all([
@@ -162,7 +172,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().checkConnection(config.ip, config.port),
       ]);
     } catch (e) {
-      console.warn('[AppStore] Init error:', e);
+      console.warn("[AppStore] Init error:", e);
     }
   },
 
@@ -173,7 +183,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentIp = targetIp ?? get().ip;
     const currentPort = targetPort ?? get().port;
 
-    set({ status: 'testing', errorMessage: null });
+    set({ status: "testing", errorMessage: null });
 
     const test = await testServerConnection(currentIp, currentPort);
     set({ latencyMs: test.latencyMs });
@@ -181,20 +191,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (test.reachable && test.serverInfo) {
       set({
         serverInfo: test.serverInfo,
-        status: 'connected',
+        status: "connected",
       });
-      await saveServerConfig(currentIp, currentPort, test.serverInfo.drive_name);
+      await saveServerConfig(
+        currentIp,
+        currentPort,
+        test.serverInfo.drive_name,
+      );
       const updatedHistory = await getServerHistory();
       set({ serverHistory: updatedHistory });
     } else {
       set({
         serverInfo: test.serverInfo ?? {
-          status: 'offline',
-          server: 'Unreachable',
+          status: "offline",
+          server: "Unreachable",
           error: test.error,
         },
-        status: 'error',
-        errorMessage: test.error ?? 'Server is not reachable',
+        status: "error",
+        errorMessage: test.error ?? "Server is not reachable",
       });
     }
   },
@@ -204,18 +218,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentPort = targetPort ?? get().port;
 
     // First test connection & update live latency / serverInfo / status
-    set({ status: 'testing', errorMessage: null });
+    set({ status: "testing", errorMessage: null });
     const connTest = await testServerConnection(currentIp, currentPort);
     set({ latencyMs: connTest.latencyMs });
 
     if (!connTest.reachable || !connTest.serverInfo) {
-      const err = connTest.error ?? 'Server is not reachable';
+      const err = connTest.error ?? "Server is not reachable";
       set({
-        status: 'error',
+        status: "error",
         errorMessage: err,
         serverInfo: connTest.serverInfo ?? {
-          status: 'offline',
-          server: 'Unreachable',
+          status: "offline",
+          server: "Unreachable",
           error: err,
         },
         syncProgress: null,
@@ -225,7 +239,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({
       serverInfo: connTest.serverInfo,
-      status: 'downloading',
+      status: "downloading",
       errorMessage: null,
       syncProgress: { bytesWritten: 0, contentLength: 0, percentage: 0 },
     });
@@ -238,28 +252,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       downloadPath,
       (progress) => {
         set({ syncProgress: progress });
-      }
+      },
     );
 
     if (!downloadRes.success || !downloadRes.uri) {
       set({
-        status: 'error',
-        errorMessage: downloadRes.error ?? 'Database download failed',
+        status: "error",
+        errorMessage: downloadRes.error ?? "Database download failed",
         syncProgress: null,
       });
       return { success: false, error: downloadRes.error };
     }
 
-    set({ status: 'migrating' });
+    set({ status: "migrating" });
     const importSuccess = await importDownloadedSnapshot(dbName);
 
     if (!importSuccess) {
       set({
-        status: 'error',
-        errorMessage: 'Failed to verify the downloaded SQLite database snapshot.',
+        status: "error",
+        errorMessage:
+          "Failed to verify the downloaded SQLite database snapshot.",
         syncProgress: null,
       });
-      return { success: false, error: 'Database import failed' };
+      return { success: false, error: "Database import failed" };
     }
 
     const nowIso = new Date().toISOString();
@@ -275,7 +290,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const updatedHistory = await getServerHistory();
 
     set({
-      status: 'connected',
+      status: "connected",
       syncProgress: null,
       lastSyncTime: nowIso,
       serverInfo: info,
@@ -305,7 +320,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         recentMedia: recentList,
       });
     } catch (e) {
-      console.warn('[AppStore] Error refreshing library:', e);
+      console.warn("[AppStore] Error refreshing library:", e);
     } finally {
       set({ isRefreshing: false, isLoading: false });
     }
@@ -313,12 +328,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   fetchMediaPage: async (options: FetchPageOptions = {}) => {
     const {
-      query = '',
-      type = 'all',
+      query = "",
+      type = "all",
       albumId,
       tagId,
-      sortBy = 'created_at',
-      sortOrder = 'DESC',
+      sortBy = "created_at",
+      sortOrder = "DESC",
       page = 1,
       pageSize = get().pageSize,
     } = options;
@@ -345,7 +360,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isLoading: false,
       });
     } catch (e) {
-      console.warn('[AppStore] fetchMediaPage error:', e);
+      console.warn("[AppStore] fetchMediaPage error:", e);
       set({ isLoading: false });
     }
   },
@@ -358,6 +373,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateDownloadLocation: async (location: string) => {
     await saveDownloadLocation(location);
     set({ downloadLocation: location });
+  },
+
+  refreshDownloadedItems: async () => {
+    const updatedMap = await getDownloadedItemsMap();
+    set({ downloadedItems: { ...updatedMap } });
   },
 
   startDownloadMediaItem: async (item: MediaItem) => {
@@ -392,7 +412,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (result.success) {
       const updatedMap = await getDownloadedItemsMap();
-      set({ downloadedItems: updatedMap });
+      set((state) => ({
+        downloadedItems: {
+          ...state.downloadedItems,
+          ...updatedMap,
+          ...(result.record ? { [item.id]: result.record } : {}),
+        },
+      }));
       return { success: true };
     } else {
       return { success: false, error: result.error };
@@ -400,8 +426,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   removeDownloadedMediaItem: async (mediaId: number) => {
+    const currentRecord = get().downloadedItems[mediaId];
+    if (currentRecord?.localUri) {
+      deleteDownloadedFile(
+        currentRecord.localUri,
+        currentRecord.thumbnailLocalUri,
+      ).catch(() => {});
+    }
     const updatedMap = await removeDownloadedItemRecord(mediaId);
-    set({ downloadedItems: updatedMap });
+    set({ downloadedItems: { ...updatedMap } });
   },
 
   removeHistoryServer: async (delIp: string, delPort: number) => {

@@ -18,7 +18,12 @@ export interface DownloadProgress {
 }
 
 export async function requestStoragePermission(): Promise<boolean> {
-  console.log("[Downloader] requestStoragePermission: platform=", Platform.OS, "apiLevel=", Platform.Version);
+  console.log(
+    "[Downloader] requestStoragePermission: platform=",
+    Platform.OS,
+    "apiLevel=",
+    Platform.Version,
+  );
   if (Platform.OS !== "android") return true;
   try {
     const apiLevel = Platform.Version;
@@ -125,13 +130,42 @@ export async function resolveDestinationDirectory(
   return fullDestDir;
 }
 
+export async function deleteDownloadedFile(
+  localUri?: string,
+  thumbnailLocalUri?: string,
+): Promise<void> {
+  try {
+    if (localUri) {
+      const fileInfo = await FileSystem.getInfoAsync(localUri);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(localUri, { idempotent: true });
+        console.log("[Downloader] Deleted local media file:", localUri);
+      }
+    }
+    if (thumbnailLocalUri) {
+      const thumbInfo = await FileSystem.getInfoAsync(thumbnailLocalUri);
+      if (thumbInfo.exists) {
+        await FileSystem.deleteAsync(thumbnailLocalUri, { idempotent: true });
+        console.log("[Downloader] Deleted local thumbnail:", thumbnailLocalUri);
+      }
+    }
+  } catch (err) {
+    console.warn("[Downloader] Error deleting local file:", err);
+  }
+}
+
 export async function downloadMediaItem(
   item: MediaItem,
   ip: string,
   port: number,
   onProgress?: (progress: DownloadProgress) => void,
-): Promise<{ success: boolean; localUri?: string; error?: string }> {
-  const toastId = `dl-${item.id}`;
+): Promise<{
+  success: boolean;
+  localUri?: string;
+  record?: DownloadedItemRecord;
+  error?: string;
+}> {
+  const toastId = `dl-${item.id}` || `dl-${Date.now()}`;
   console.log("[Downloader] ===== downloadMediaItem START =====", {
     itemId: item.id,
     fileSize: item.file_size,
@@ -145,11 +179,6 @@ export async function downloadMediaItem(
     const destDir = await resolveDestinationDirectory(item.album_name);
     const destFilePath = `${destDir}${fileName}`;
 
-    // Only gate on storage permission when the user has pointed the download
-    // location at genuinely external/shared storage. Sandbox writes (the
-    // default) need no permission — and requesting READ_MEDIA_* there just
-    // aborts on Android 13+ in Expo Go. This keeps the gate ready for a future
-    // "save to external folder" option without breaking sandbox downloads.
     if (!isSandboxPath(destDir)) {
       console.log("[Downloader] external dest — requesting storage permission");
       const hasPerm = await requestStoragePermission();
@@ -168,7 +197,6 @@ export async function downloadMediaItem(
 
     toast.loading(`Downloading ${fileName}... 0%`, { id: toastId });
 
-    // Use FileSystem resumable download with live progress toast updates
     const downloadResumable = FileSystem.createDownloadResumable(
       streamUrl,
       destFilePath,
@@ -241,13 +269,22 @@ export async function downloadMediaItem(
 
       const thumbUrl = getThumbnailUrl(ip, port, item.id);
       const thumbDestPath = `${thumbsDir}${item.id}.jpg`;
-      const thumbResult = await FileSystem.downloadAsync(thumbUrl, thumbDestPath);
+      const thumbResult = await FileSystem.downloadAsync(
+        thumbUrl,
+        thumbDestPath,
+      );
       if (thumbResult && thumbResult.uri) {
         thumbnailLocalUri = thumbResult.uri;
-        console.log("[Downloader] Saved thumbnail to .thumbs:", thumbnailLocalUri);
+        console.log(
+          "[Downloader] Saved thumbnail to .thumbs:",
+          thumbnailLocalUri,
+        );
       }
     } catch (thumbErr) {
-      console.warn("[Downloader] Could not download thumbnail to .thumbs:", thumbErr);
+      console.warn(
+        "[Downloader] Could not download thumbnail to .thumbs:",
+        thumbErr,
+      );
     }
 
     const record: DownloadedItemRecord = {
@@ -275,7 +312,7 @@ export async function downloadMediaItem(
       },
     );
 
-    return { success: true, localUri: result.uri };
+    return { success: true, localUri: result.uri, record };
   } catch (err: any) {
     console.log("[Downloader] downloadMediaItem failed:", {
       code: err?.code,

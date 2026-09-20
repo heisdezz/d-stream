@@ -1,0 +1,73 @@
+/** @type {import('twrnc').TwConfig} */
+module.exports = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          DEFAULT: '#0B57D0',
+          dark: '#A8C7FA',
+          container: '#D3E3FD',
+          'container-dark': '#0842A0',
+          on: '#FFFFFF',
+          'on-dark': '#062E6F',
+          'on-container': '#041E49',
+          'on-container-dark': '#D3E3FD',
+        },
+        secondary: {
+          DEFAULT: '#00639B',
+          dark: '#7FCFFF',
+          container: '#C2E7FF',
+          'container-dark': '#004A77',
+          on: '#FFFFFF',
+          'on-dark': '#003355',
+          'on-container': '#001D35',
+          'on-container-dark': '#C2E7FF',
+        },
+        tertiary: {
+          DEFAULT: '#006A6A',
+          dark: '#4CDADA',
+          container: '#6FF7F7',
+          'container-dark': '#004F4F',
+          on: '#FFFFFF',
+          'on-dark': '#003737',
+          'on-container': '#002020',
+          'on-container-dark': '#6FF7F7',
+        },
+        surface: {
+          DEFAULT: '#F8F9FA',
+          dark: '#111315',
+          container: '#EDEDEE',
+          'container-dark': '#1E2022',
+          'container-low': '#F3F4F6',
+          'container-low-dark': '#191C1E',
+          'container-high': '#E7E8E9',
+          'container-high-dark': '#282A2D',
+          'container-highest': '#E1E2E4',
+          'container-highest-dark': '#333538',
+        },
+        outline: {
+          DEFAULT: '#747775',
+          dark: '#8E918F',
+          variant: '#C4C7C5',
+          'variant-dark': '#444746',
+        },
+        error: {
+          DEFAULT: '#BA1A1A',
+          dark: '#FFB4AB',
+          container: '#FFDAD6',
+          'container-dark': '#93000A',
+        },
+      },
+      borderRadius: {
+        none: '0px',
+        xs: '4px',
+        sm: '8px',
+        md: '12px',
+        lg: '16px',
+        xl: '28px',
+        full: '9999px',
+      },
+    },
+  },
+};

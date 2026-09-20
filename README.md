@@ -1,56 +1,81 @@
-# Welcome to your Expo app 👋
+# D-Stream Mobile Application
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+D-Stream is a local-first, offline-capable mobile media streaming and library companion app built with **Expo (SDK 57)**, **React Native**, **Expo SQLite**, and **Material Design 3**. It connects to a local desktop media sync server over Wi-Fi/LAN, synchronizes full SQLite catalog snapshots, and streams or downloads media on demand.
 
-## Get started
+---
 
-1. Install dependencies
+## 📚 Technical Documentation
 
-   ```bash
-   npm install
-   ```
+Comprehensive architectural and implementation guides are available in the [`docs/`](./docs) directory:
 
-2. Start the app
+- [**Services & Store Architecture (`docs/SERVICES_AND_STORE.md`)**](./docs/SERVICES_AND_STORE.md)
+  - Detailed breakdown of `storage.ts`, `sync-api.ts`, `local-db.ts`, and `downloader.ts`.
+  - Jotai atomic state management (`atoms.ts`) and Zustand global store (`use-app-store.ts`).
+  - Single-flight SQLite locks, atomic database swapping, and Android 13+ permission handling.
+- [**Application Routes & Data Models (`docs/APP_ROUTING_AND_MODELS.md`)**](./docs/APP_ROUTING_AND_MODELS.md)
+  - Full TypeScript entity definitions (`MediaItem`, `Album`, `Tag`, `LibraryStats`, etc.).
+  - File-based navigation hierarchy under `src/app/` (Dashboard, Explorer, Collections, Sync, Album Gallery, Media Inspector).
+  - Native video playback (`expo-video`), LegendList virtualization, and offline-first playback fallback.
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 🚀 Key Features
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- ⚡ **Local-First SQLite Database**: Fast offline browsing of large photo and video catalogs with dynamic filtering, full-text search, and multi-field sorting.
+- 🔄 **Atomic LAN Snapshot Sync**: Download full binary database snapshots from your desktop server with zero-downtime hot swapping.
+- 📱 **Adaptive Media Playback**: Native video streaming via `expo-video` and high-res photo viewing via `expo-image`, seamlessly falling back to downloaded offline files when not on your home Wi-Fi.
+- 📥 **Background Resumable Downloads**: Download media directly to device storage with live toast progress bars and automatic thumbnail caching for offline grids.
+- 🎨 **Material Design 3 Theming**: Expressive M3 components with dynamic light and dark modes, rounded active tab pills, and responsive layouts.
+- 🚀 **Smooth 60 FPS Lists**: Virtualized gallery grids and lists powered by `@legendapp/list`.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 🛠 Tech Stack
 
-When you're ready, run:
+- **Framework**: [Expo SDK 57](https://expo.dev) with [Expo Router](https://docs.expo.dev/router/introduction/) (React 19, React Native 0.86)
+- **State Management**: [Zustand 5](https://zustand-demo.pmnd.rs/) (global application state) + [Jotai 2](https://jotai.org/) (granular UI atoms)
+- **Local Database**: [Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/)
+- **File System & Downloads**: [Expo FileSystem](https://docs.expo.dev/versions/latest/sdk/filesystem/)
+- **Media Playback**: [Expo Video](https://docs.expo.dev/versions/latest/sdk/video/) & [Expo Image](https://docs.expo.dev/versions/latest/sdk/image/)
+- **Data Fetching & Caching**: [TanStack React Query v5](https://tanstack.com/query/latest)
+- **Notifications**: [Sonner Native](https://github.com/gunnartorfis/sonner-native)
+
+---
+
+## 🏃 Getting Started
+
+### 1. Install Dependencies
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Start the Development Server
 
-### Other setup steps
+```bash
+npx expo start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+### 3. Run on Target Platform
 
-## Learn more
+- **Android**: `npm run android`
+- **iOS**: `npm run ios`
+- **Web**: `npm run web`
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 📁 Project Structure
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/
+├── app/                  # Expo Router file-based pages and layouts
+│   ├── (tabs)/           # Bottom tabs (Dashboard, Explorer, Collections, Sync)
+│   ├── album/[id].tsx    # Album gallery view
+│   └── media/[id].tsx    # Media inspector modal
+├── components/           # Reusable UI & Material 3 components
+├── constants/            # Theme tokens, colors, elevation, spacing
+├── hooks/                # Custom React & TanStack query hooks
+├── services/             # Local SQLite, sync API, storage, downloader
+├── store/                # Zustand global store & Jotai atoms
+└── types/                # TypeScript interfaces and model definitions
+```

@@ -1,10 +1,10 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { Shapes } from '@/constants/theme';
-import { AppIcon } from '@/components/common/app-icon';
+import React from "react";
+import { Tabs } from "expo-router";
+import { View, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { Shapes } from "@/constants/theme";
+import { AppIcon } from "@/components/common/app-icon";
 
 export default function TabLayout() {
   const { colors } = useMaterialTheme();
@@ -22,7 +22,7 @@ export default function TabLayout() {
           shadowOpacity: 0,
         },
         headerTitleStyle: {
-          fontWeight: '800',
+          fontWeight: "800",
           fontSize: 18,
           color: colors.onSurface,
         },
@@ -39,7 +39,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: colors.onSurfaceVariant,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '700',
+          fontWeight: "700",
           marginTop: 2,
         },
       }}
@@ -47,8 +47,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          headerTitle: 'Media Dashboard',
+          title: "Dashboard",
+          headerTitle: "Media Dashboard",
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
@@ -57,8 +57,8 @@ export default function TabLayout() {
               ]}
             >
               <AppIcon
-                name={focused ? 'dashboard' : 'dashboard-customize'}
-                symbolName={focused ? 'house.fill' : 'house'}
+                name={focused ? "dashboard" : "dashboard-customize"}
+                symbolName={focused ? "house.fill" : "house"}
                 size={22}
                 color={focused ? colors.onSecondaryContainer : color}
               />
@@ -70,8 +70,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="media"
         options={{
-          title: 'Explorer',
-          headerTitle: 'Media Explorer',
+          title: "Explorer",
+          headerTitle: "Media Explorer",
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
@@ -80,8 +80,8 @@ export default function TabLayout() {
               ]}
             >
               <AppIcon
-                name={focused ? 'perm-media' : 'photo-library'}
-                symbolName={focused ? 'photo.stack.fill' : 'photo.stack'}
+                name={focused ? "perm-media" : "photo-library"}
+                symbolName={focused ? "photo.stack.fill" : "photo.stack"}
                 size={22}
                 color={focused ? colors.onSecondaryContainer : color}
               />
@@ -93,8 +93,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="albums"
         options={{
-          title: 'Collections',
-          headerTitle: 'Albums & Tags',
+          title: "Collections",
+          headerTitle: "Albums & Tags",
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
@@ -103,8 +103,33 @@ export default function TabLayout() {
               ]}
             >
               <AppIcon
-                name={focused ? 'collections-bookmark' : 'folder-special'}
-                symbolName={focused ? 'folder.fill.badge.plus' : 'folder'}
+                name={focused ? "collections-bookmark" : "folder-special"}
+                symbolName={focused ? "folder.fill.badge.plus" : "folder"}
+                size={22}
+                color={focused ? colors.onSecondaryContainer : color}
+              />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="downloads"
+        options={{
+          title: "Downloads",
+          headerTitle: "Offline Downloads",
+          tabBarIcon: ({ color, focused }) => (
+            <View
+              style={[
+                styles.iconBox,
+                focused && { backgroundColor: colors.secondaryContainer },
+              ]}
+            >
+              <AppIcon
+                name={focused ? "file-download-done" : "file-download"}
+                symbolName={
+                  focused ? "arrow.down.circle.fill" : "arrow.down.circle"
+                }
                 size={22}
                 color={focused ? colors.onSecondaryContainer : color}
               />
@@ -116,8 +141,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="sync"
         options={{
-          title: 'Sync',
-          headerTitle: 'LAN Sync & DB',
+          title: "Sync",
+          headerTitle: "LAN Sync & DB",
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
@@ -144,7 +169,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 28,
     borderRadius: Shapes.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
