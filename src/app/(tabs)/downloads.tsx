@@ -70,6 +70,7 @@ export default function DownloadsScreen() {
     downloadLocation,
     removeDownloadedMediaItem,
     refreshDownloadedItems,
+    playAsShorts,
   } = useAppStore();
 
   useFocusEffect(
@@ -115,7 +116,14 @@ export default function DownloadsScreen() {
   }, [recordsList, filterType, searchQuery]);
 
   const handleMediaPress = (mediaItem: MediaItem) => {
-    router.push(`/media/${mediaItem.id}` as any);
+    if (playAsShorts) {
+      router.push({
+        pathname: "/shorts",
+        params: { mediaId: mediaItem.id.toString(), mode: "downloads" },
+      });
+    } else {
+      router.push(`/media/${mediaItem.id}` as any);
+    }
   };
 
   const handleDeleteItem = (record: DownloadedItemRecord) => {
@@ -256,19 +264,42 @@ export default function DownloadsScreen() {
             </View>
 
             {recordsList.length > 0 && (
-              <Pressable
-                onPress={handleClearAll}
-                style={({ pressed }) => [
-                  tw`p-2`,
-                  { opacity: pressed ? 0.7 : 1 },
-                ]}
-              >
-                <MaterialIcons
-                  name="delete-sweep"
-                  size={22}
-                  color={colors.error}
-                />
-              </Pressable>
+              <View style={tw`flex-row items-center gap-1`}>
+                <Pressable
+                  onPress={() => {
+                    const first = recordsList[0];
+                    if (first) {
+                      router.push({
+                        pathname: "/shorts",
+                        params: { mediaId: first.mediaId.toString(), mode: "downloads" },
+                      });
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    tw`p-2`,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="movie-filter"
+                    size={22}
+                    color={colors.primary}
+                  />
+                </Pressable>
+                <Pressable
+                  onPress={handleClearAll}
+                  style={({ pressed }) => [
+                    tw`p-2`,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <MaterialIcons
+                    name="delete-sweep"
+                    size={22}
+                    color={colors.error}
+                  />
+                </Pressable>
+              </View>
             )}
           </View>
 

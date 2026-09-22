@@ -362,11 +362,27 @@ export default function MediaDetailScreen() {
         </Pressable>
 
         <M3Button
+          label="Watch Reels"
+          icon="movie-filter"
+          variant="filled"
+          onPress={() => {
+            router.push({
+              pathname: "/shorts",
+              params: {
+                mediaId: item.id.toString(),
+                ...(item.album_id ? { albumId: item.album_id.toString() } : {}),
+              },
+            });
+          }}
+          style={{ flex: 1, marginRight: Spacing.two }}
+        />
+
+        <M3Button
           label="Open External"
           icon="open-in-new"
-          variant="filled"
+          variant="tonal"
           onPress={handleOpenExternal}
-          style={{ flex: 1, marginRight: Spacing.two }}
+          style={{ marginRight: Spacing.two }}
         />
 
         <M3Button

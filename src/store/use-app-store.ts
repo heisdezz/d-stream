@@ -31,6 +31,8 @@ import {
   ThemeMode,
   getSavedThemeConfig,
   saveThemeConfig,
+  getPlayAsShorts,
+  savePlayAsShorts,
 } from "@/services/storage";
 import {
   testServerConnection,
@@ -94,9 +96,10 @@ interface AppState {
   currentPage: number;
   pageSize: number;
 
-  // Theme State
+  // Theme & Playback State
   themeAccent: string;
   themeMode: ThemeMode;
+  playAsShorts: boolean;
 
   // Actions
   init: () => Promise<void>;
@@ -119,6 +122,7 @@ interface AppState {
   removeHistoryServer: (delIp: string, delPort: number) => Promise<void>;
   setThemeAccent: (accent: string) => Promise<void>;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  setPlayAsShorts: (enabled: boolean) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -159,6 +163,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   themeAccent: "system",
   themeMode: "system",
+  playAsShorts: false,
 
   init: async () => {
     try {
@@ -169,6 +174,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const savedDlLocation = await getSavedDownloadLocation();
       const savedDlMap = await getDownloadedItemsMap();
       const themeConfig = await getSavedThemeConfig();
+      const playAsShorts = await getPlayAsShorts();
 
       set({
         ip: config.ip,
@@ -180,6 +186,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         downloadedItems: { ...savedDlMap },
         themeAccent: themeConfig.accent,
         themeMode: themeConfig.mode,
+        playAsShorts,
       });
 
       await Promise.all([
@@ -223,7 +230,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           error: test.error,
         },
         status: "error",
-        errorMessage: test.error ?? "Server is not reachable",
+        errorMessage: test.error || "Server is offline or unreachable.",
       });
     }
   },
@@ -232,43 +239,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentIp = targetIp ?? get().ip;
     const currentPort = targetPort ?? get().port;
 
-    // First test connection & update live latency / serverInfo / status
-    set({ status: "testing", errorMessage: null });
-    const connTest = await testServerConnection(currentIp, currentPort);
-    set({ latencyMs: connTest.latencyMs });
-
-    if (!connTest.reachable || !connTest.serverInfo) {
-      const err = connTest.error ?? "Server is not reachable";
-      set({
-        status: "error",
-        errorMessage: err,
-        serverInfo: connTest.serverInfo ?? {
-          status: "offline",
-          server: "Unreachable",
-          error: err,
-        },
-        syncProgress: null,
-      });
-      return { success: false, error: err };
-    }
-
     set({
-      serverInfo: connTest.serverInfo,
       status: "downloading",
       errorMessage: null,
-      syncProgress: {
-        bytesWritten: 0,
-        contentLength: 0,
-        percentage: 0,
-      },
+      syncProgress: { bytesWritten: 0, contentLength: 1, percentage: 0 },
     });
 
-    const { path: downloadPath, dbName } = getNewSnapshotDownloadPath();
-
+    const targetUri = getNewSnapshotDownloadPath().path;
     const downloadRes = await downloadDatabaseSnapshot(
       currentIp,
       currentPort,
-      downloadPath,
+      targetUri,
       (progress) => {
         set({ syncProgress: progress });
       },
@@ -277,144 +258,108 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!downloadRes.success || !downloadRes.uri) {
       set({
         status: "error",
-        errorMessage: downloadRes.error ?? "Database download failed",
+        errorMessage:
+          downloadRes.error || "Failed to download database snapshot.",
         syncProgress: null,
       });
-      return { success: false, error: downloadRes.error };
+      return {
+        success: false,
+        error: downloadRes.error || "Failed to download database snapshot.",
+      };
     }
 
-    // Step 2: Switch to Migrating / Verification State
-    set({
-      status: "migrating",
-      syncProgress: {
-        bytesWritten: 100,
-        contentLength: 100,
-        percentage: 100,
-      },
-    });
-
-    const importSuccess = await importDownloadedSnapshot(dbName);
+    set({ status: "migrating" });
+    const importSuccess = await importDownloadedSnapshot(downloadRes.uri);
 
     if (!importSuccess) {
       set({
         status: "error",
-        errorMessage:
-          "Failed to verify the downloaded SQLite database snapshot.",
+        errorMessage: "Failed to apply database snapshot.",
         syncProgress: null,
       });
-      return { success: false, error: "Database import failed" };
+      return {
+        success: false,
+        error: "Failed to apply database snapshot.",
+      };
     }
 
-    // Success! Update last sync time and refresh library in parallel
-    const nowIso = new Date().toISOString();
-    await setLastSyncTime(nowIso);
-    await saveServerConfig(
-      currentIp,
-      currentPort,
-      connTest.serverInfo.drive_name,
-    );
-    const updatedHistory = await getServerHistory();
+    const now = new Date().toISOString();
+    await setLastSyncTime(now);
+
+    // Refresh store library data
+    await get().refreshLibrary();
 
     set({
       status: "connected",
-      lastSyncTime: nowIso,
+      lastSyncTime: now,
       syncProgress: null,
-      serverHistory: updatedHistory,
+      hasDatabase: true,
     });
 
-    await get().refreshLibrary();
     return { success: true };
   },
 
   refreshLibrary: async () => {
     set({ isRefreshing: true });
     try {
-      const dbReady = await isDatabaseAvailable();
-      if (!dbReady) {
-        set({
-          hasDatabase: false,
-          isRefreshing: false,
-          stats: {
-            total_items: 0,
-            images: 0,
-            videos: 0,
-            albums: 0,
-            tags: 0,
-            db_size_bytes: 0,
-            db_size_formatted: "0 B",
-            db_exists: false,
-          },
-          mediaItems: [],
-          totalMediaCount: 0,
-          albums: [],
-          tags: [],
-          recentMedia: [],
-        });
+      const dbAvailable = await isDatabaseAvailable();
+      if (!dbAvailable) {
+        set({ hasDatabase: false, isRefreshing: false });
         return;
       }
 
-      const [libStats, albumsList, tagsList, recents, firstPage] =
-        await Promise.all([
-          getLibraryStats(),
-          getAlbums(),
-          getTags(),
-          getRecentMedia(8),
-          getMediaItems({ limit: get().pageSize, offset: 0 }),
-        ]);
+      const [stats, albums, tags, recentMedia] = await Promise.all([
+        getLibraryStats(),
+        getAlbums(),
+        getTags(),
+        getRecentMedia(12),
+      ]);
 
       set({
-        hasDatabase: true,
-        stats: libStats,
-        albums: albumsList,
-        tags: tagsList,
-        recentMedia: recents,
-        mediaItems: firstPage.items,
-        totalMediaCount: firstPage.totalCount,
-        currentPage: 1,
+        hasDatabase: stats.db_exists,
+        stats,
+        albums,
+        tags,
+        recentMedia,
         isRefreshing: false,
       });
+
+      // Also refresh initial media page if none loaded
+      if (get().mediaItems.length === 0) {
+        await get().fetchMediaPage({ page: 1 });
+      }
     } catch (e) {
-      console.warn("[AppStore] refreshLibrary error:", e);
+      console.warn("[AppStore] refreshLibrary failed:", e);
       set({ isRefreshing: false });
     }
   },
 
-  fetchMediaPage: async (options?: FetchPageOptions) => {
-    const dbReady = await isDatabaseAvailable();
-    if (!dbReady) return;
-
-    const query = options?.query;
-    const type = options?.type;
-    const albumId = options?.albumId;
-    const tagId = options?.tagId;
-    const sortBy = options?.sortBy || "created_at";
-    const sortOrder = options?.sortOrder || "DESC";
-    const page = options?.page || get().currentPage || 1;
-    const pageSize = options?.pageSize || get().pageSize || DEFAULT_PAGE_SIZE;
-
+  fetchMediaPage: async (options = {}) => {
     set({ isLoading: true });
     try {
-      const offset = Math.max(0, (page - 1) * pageSize);
-      const result = await getMediaItems({
-        query,
-        type,
-        albumId,
-        tagId,
-        sortBy,
-        sortOrder,
+      const pageSize = options.pageSize ?? get().pageSize ?? DEFAULT_PAGE_SIZE;
+      const page = options.page ?? 1;
+      const offset = (page - 1) * pageSize;
+
+      const { items, totalCount } = await getMediaItems({
+        query: options.query,
+        type: options.type,
+        albumId: options.albumId,
+        tagId: options.tagId,
+        sortBy: options.sortBy ?? "created_at",
+        sortOrder: options.sortOrder ?? "DESC",
         limit: pageSize,
         offset,
       });
 
       set({
-        mediaItems: result.items,
-        totalMediaCount: result.totalCount,
+        mediaItems: items,
+        totalMediaCount: totalCount,
         currentPage: page,
-        pageSize,
         isLoading: false,
       });
     } catch (e) {
-      console.warn("[AppStore] fetchMediaPage error:", e);
+      console.warn("[AppStore] fetchMediaPage failed:", e);
       set({ isLoading: false });
     }
   },
@@ -506,5 +451,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const accent = get().themeAccent;
     await saveThemeConfig(accent, mode);
     set({ themeMode: mode });
+  },
+
+  setPlayAsShorts: async (enabled: boolean) => {
+    await savePlayAsShorts(enabled);
+    set({ playAsShorts: enabled });
   },
 }));

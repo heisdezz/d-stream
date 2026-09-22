@@ -108,6 +108,15 @@ export default function RootLayout() {
                 },
               }}
             />
+            <Stack.Screen
+              name="shorts"
+              options={{
+                presentation: "fullScreenModal",
+                headerShown: false,
+                animation: "fade",
+                contentStyle: { backgroundColor: "#000000" },
+              }}
+            />
           </Stack>
         </SafeAreaProvider>
       </QueryClientProvider>

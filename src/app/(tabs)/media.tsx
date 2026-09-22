@@ -77,6 +77,7 @@ export default function MediaExplorerScreen() {
     stats,
     fetchMediaPage,
     updatePageSize,
+    playAsShorts,
   } = useAppStore();
 
   useEffect(() => {
@@ -120,7 +121,17 @@ export default function MediaExplorerScreen() {
   };
 
   const handleMediaPress = (item: MediaItem) => {
-    router.push(`/media/${item.id}`);
+    if (playAsShorts) {
+      router.push({
+        pathname: "/shorts",
+        params: {
+          mediaId: item.id.toString(),
+          ...(selectedAlbumId ? { albumId: selectedAlbumId.toString() } : {}),
+        },
+      });
+    } else {
+      router.push(`/media/${item.id}`);
+    }
   };
 
   const toggleLayoutMode = () => {

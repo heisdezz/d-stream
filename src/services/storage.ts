@@ -34,6 +34,7 @@ interface AppStorageData {
   downloadedItems: Record<number, DownloadedItemRecord>;
   themeAccent: string;
   themeMode: ThemeMode;
+  playAsShorts: boolean;
 }
 
 const defaultData: AppStorageData = {
@@ -47,6 +48,7 @@ const defaultData: AppStorageData = {
   downloadedItems: {},
   themeAccent: "system",
   themeMode: "system",
+  playAsShorts: false,
 };
 
 let memoryCache: AppStorageData = { ...defaultData };
@@ -237,5 +239,17 @@ export async function saveThemeConfig(
   data.themeMode = mode;
   memoryCache.themeAccent = accent;
   memoryCache.themeMode = mode;
+  await saveDataToDisk();
+}
+
+export async function getPlayAsShorts(): Promise<boolean> {
+  const data = await loadDataFromDisk();
+  return !!data.playAsShorts;
+}
+
+export async function savePlayAsShorts(enabled: boolean): Promise<void> {
+  const data = await loadDataFromDisk();
+  data.playAsShorts = enabled;
+  memoryCache.playAsShorts = enabled;
   await saveDataToDisk();
 }

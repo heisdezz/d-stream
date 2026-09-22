@@ -7,6 +7,7 @@ import {
   TextInput,
   Pressable,
   Alert,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSetAtom } from "jotai";
@@ -82,6 +83,8 @@ export default function SyncScreen() {
     updatePageSize,
     updateDownloadLocation,
     removeHistoryServer,
+    playAsShorts,
+    setPlayAsShorts,
   } = useAppStore();
 
   const [inputIp, setInputIp] = useState<string>(ip);
@@ -730,6 +733,48 @@ export default function SyncScreen() {
         </View>
       </M3Card>
 
+      {/* Play as Shorts / Reels Preference Card */}
+      <M3Card variant="elevated" style={styles.prefCard}>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="movie-filter" size={22} color={colors.primary} />
+          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+            Play as Shorts / Reels
+          </Text>
+          <M3Badge
+            label={playAsShorts ? "SHORTS ENABLED" : "STANDARD"}
+            variant={playAsShorts ? "primary" : "surface"}
+            size="small"
+            style={{ marginLeft: "auto" }}
+          />
+        </View>
+
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1, marginRight: Spacing.two }}>
+            <Text style={[styles.switchTitle, { color: colors.onSurface }]}>
+              TikTok & Reels Vertical Player
+            </Text>
+            <Text
+              style={[
+                styles.prefDesc,
+                { color: colors.onSurfaceVariant, marginTop: Spacing.one / 2 },
+              ]}
+            >
+              When tapping media or albums, stream directly in full-screen vertical
+              reels with swipe-to-next, auto-looping playback, and album-isolated navigation.
+            </Text>
+          </View>
+          <Switch
+            value={playAsShorts}
+            onValueChange={setPlayAsShorts}
+            trackColor={{
+              false: colors.surfaceContainerHighest,
+              true: colors.primary,
+            }}
+            thumbColor={playAsShorts ? colors.onPrimary : colors.outline}
+          />
+        </View>
+      </M3Card>
+
       {/* Media Download Storage Directory Card */}
       <M3Card variant="elevated" style={styles.prefCard}>
         <View style={styles.cardHeader}>
@@ -1064,6 +1109,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: Spacing.two,
     fontVariant: ["tabular-nums"],
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: Spacing.one,
+  },
+  switchTitle: {
+    fontSize: 14,
+    fontWeight: "700",
   },
   prefCard: {
     marginBottom: Spacing.three,

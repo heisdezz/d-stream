@@ -23,6 +23,7 @@ import { ConnectionStatus } from '@/components/sync/connection-status';
 import { SyncProgressBar } from '@/components/sync/sync-progress-bar';
 import { MediaGridItem } from '@/components/media/media-grid-item';
 import { AlbumCard } from '@/components/media/album-card';
+import { MediaItem } from '@/types/models';
 import { MaterialIcons } from '@expo/vector-icons';
 
 function getGreeting(): string {
@@ -71,10 +72,22 @@ export default function DashboardScreen() {
     checkConnection,
     syncDatabase,
     refreshLibrary,
+    playAsShorts,
   } = useAppStore();
 
   const contentWidth = Math.min(width - Spacing.four * 2, MaxContentWidth);
   const gridItemWidth = (contentWidth - Spacing.two) / 2;
+
+  const handleRecentMediaPress = (media: MediaItem) => {
+    if (playAsShorts) {
+      router.push({
+        pathname: "/shorts",
+        params: { mediaId: media.id.toString() },
+      });
+    } else {
+      router.push(`/media/${media.id}`);
+    }
+  };
 
   const handlePullRefresh = async () => {
     await Promise.all([checkConnection(), refreshLibrary()]);
@@ -475,12 +488,29 @@ export default function DashboardScreen() {
         <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
           Recent Media
         </Text>
-        <M3Button
-          label="Explore All"
-          variant="text"
-          size="small"
-          onPress={() => handleCategoryPress('all')}
-        />
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {recentMedia.length > 0 && (
+            <M3Button
+              label="Reels"
+              icon="movie-filter"
+              variant="tonal"
+              size="small"
+              style={{ marginRight: Spacing.one }}
+              onPress={() => {
+                router.push({
+                  pathname: "/shorts",
+                  params: { mediaId: recentMedia[0].id.toString() },
+                });
+              }}
+            />
+          )}
+          <M3Button
+            label="Explore All"
+            variant="text"
+            size="small"
+            onPress={() => handleCategoryPress('all')}
+          />
+        </View>
       </View>
 
       {!hasDatabase && stats.total_items === 0 ? (
@@ -543,7 +573,7 @@ export default function DashboardScreen() {
               width={gridItemWidth}
               serverIp={syncStatus === 'connected' ? ip : undefined}
               serverPort={port}
-              onPress={(media) => router.push(`/media/${media.id}`)}
+              onPress={handleRecentMediaPress}
             />
           ))}
         </View>

@@ -21,6 +21,7 @@ import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
 import { DebouncedSearchBar } from '@/components/common/debounced-search-bar';
 import { M3SegmentedRow, SegmentItem } from '@/components/material/m3-segmented-row';
 import { M3Badge } from '@/components/material/m3-badge';
+import { M3Button } from '@/components/material/m3-button';
 import { MediaGridItem } from '@/components/media/media-grid-item';
 import { MediaListItem } from '@/components/media/media-list-item';
 import { PaginationBar } from '@/components/media/pagination-bar';
@@ -44,7 +45,7 @@ export default function AlbumGalleryScreen() {
 
   const albumId = id ? parseInt(id, 10) : NaN;
 
-  const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize } = useAppStore();
+  const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize, playAsShorts } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [type, setType] = useState<MediaTypeFilter>('all');
@@ -123,12 +124,23 @@ export default function AlbumGalleryScreen() {
 
   const estimatedSize = layoutMode === 'list' ? 88 : Math.round(gridItemWidth * 1.1);
 
+  const handleMediaPress = (m: MediaItem) => {
+    if (playAsShorts) {
+      router.push({
+        pathname: '/shorts',
+        params: { mediaId: m.id.toString(), albumId: albumId.toString() },
+      });
+    } else {
+      router.push(`/media/${m.id}`);
+    }
+  };
+
   const renderItem = ({ item }: { item: MediaItem }) => {
     if (layoutMode === 'list') {
       return (
         <MediaListItem
           item={item}
-          onPress={(m) => router.push(`/media/${m.id}`)}
+          onPress={handleMediaPress}
           serverIp={syncStatus === 'connected' ? ip : undefined}
           serverPort={port}
         />
@@ -143,7 +155,7 @@ export default function AlbumGalleryScreen() {
       >
         <MediaGridItem
           item={item}
-          onPress={(m) => router.push(`/media/${m.id}`)}
+          onPress={handleMediaPress}
           width={gridItemWidth}
           serverIp={syncStatus === 'connected' ? ip : undefined}
           serverPort={port}
@@ -198,6 +210,23 @@ export default function AlbumGalleryScreen() {
               {album.description}
             </Text>
           )}
+
+          <M3Button
+            label="Watch as Reels"
+            icon="play-arrow"
+            variant="filled"
+            size="small"
+            onPress={() => {
+              const target = mediaItems[0];
+              if (target) {
+                router.push({
+                  pathname: '/shorts',
+                  params: { mediaId: target.id.toString(), albumId: albumId.toString() },
+                });
+              }
+            }}
+            style={{ marginTop: Spacing.two, alignSelf: 'flex-start' }}
+          />
         </View>
       </View>
 
