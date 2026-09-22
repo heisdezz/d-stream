@@ -21,7 +21,6 @@ import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
 import {
   PAGE_SIZE_OPTIONS,
   DEFAULT_DOWNLOAD_LOCATION,
-  ThemeMode,
 } from "@/services/storage";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
@@ -54,7 +53,6 @@ export default function SyncScreen() {
     colors,
     themeAccent,
     themeMode,
-    isDark,
     isDynamicSupported,
     setThemeAccent,
     setThemeMode,
@@ -77,7 +75,6 @@ export default function SyncScreen() {
     stats,
     pageSize,
     downloadLocation,
-    downloadedItems,
     checkConnection,
     syncDatabase,
     updatePageSize,
@@ -91,9 +88,8 @@ export default function SyncScreen() {
   const [inputPort, setInputPort] = useState<string>(port.toString());
   const [inputDlLocation, setInputDlLocation] =
     useState<string>(downloadLocation);
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [showManualConfig, setShowManualConfig] = useState<boolean>(
-    !serverHistory.length
+    !serverHistory.length,
   );
 
   useEffect(() => {
@@ -118,10 +114,7 @@ export default function SyncScreen() {
     setPort(p);
     const res = await syncDatabase(inputIp.trim(), p);
     if (res.success) {
-      Alert.alert(
-        "Sync Complete",
-        "Local SQLite database successfully updated with fresh media library snapshot!",
-      );
+      toast.success("Database synced successfully!");
     } else {
       Alert.alert("Sync Failed", res.error || "Could not download database.");
     }
@@ -139,16 +132,13 @@ export default function SyncScreen() {
   const handleSaveDownloadLocation = async () => {
     const loc = inputDlLocation.trim() || DEFAULT_DOWNLOAD_LOCATION;
     await updateDownloadLocation(loc);
-    Alert.alert("Storage Path Saved", `Download location updated to: ${loc}`);
+    toast.success(`Download location saved to ${loc}`);
   };
 
   const handleResetDownloadLocation = async () => {
     setInputDlLocation(DEFAULT_DOWNLOAD_LOCATION);
     await updateDownloadLocation(DEFAULT_DOWNLOAD_LOCATION);
-    Alert.alert(
-      "Reset to Default",
-      `Download location reset to: ${DEFAULT_DOWNLOAD_LOCATION}`,
-    );
+    toast.info(`Reset to default: ${DEFAULT_DOWNLOAD_LOCATION}`);
   };
 
   const handleSelectHistoryServer = async (
@@ -170,27 +160,6 @@ export default function SyncScreen() {
     setPageSizeAtom(size);
     await updatePageSize(size);
   };
-
-  const downloadedCount = Object.keys(downloadedItems).length;
-
-  const faqs = [
-    {
-      q: "How do I start the sync server on Linux?",
-      a: "From your desktop terminal, navigate to the media project directory and run: cargo run --release or bun run server. The server binds to 0.0.0.0:8080 and streams SQLite snapshots.",
-    },
-    {
-      q: "Why can't my phone reach the desktop server?",
-      a: "Verify both phone and desktop are on the same Wi-Fi network (not guest Wi-Fi). If Linux firewall (ufw) is active, allow the port via: sudo ufw allow 8080/tcp",
-    },
-    {
-      q: "How does offline playback work?",
-      a: "When you tap the download button on any media item or album, full-quality video/photos are copied to internal device storage. You can play them anytime even when offline.",
-    },
-    {
-      q: "Where is the SQLite database stored on device?",
-      a: "The SQLite database snapshot is safely managed by expo-sqlite in the app's sandboxed document directory (SQLite/media_library.db).",
-    },
-  ];
 
   return (
     <ScrollView
@@ -218,7 +187,7 @@ export default function SyncScreen() {
         >
           <MaterialIcons
             name="error-outline"
-            size={22}
+            size={20}
             color={colors.onErrorContainer}
           />
           <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>
@@ -227,14 +196,14 @@ export default function SyncScreen() {
         </M3Card>
       )}
 
-      {/* Sync Progress Bar */}
+      {/* Sync Progress */}
       {syncProgress && (
         <M3Card variant="outlined" style={{ marginBottom: Spacing.three }}>
           <SyncProgressBar progress={syncProgress} />
         </M3Card>
       )}
 
-      {/* Automatic LAN Server Discovery */}
+      {/* LAN Server Discovery Scanner */}
       <LanServerScanner
         currentIp={inputIp}
         currentPort={parseInt(inputPort, 10) || 8080}
@@ -244,17 +213,12 @@ export default function SyncScreen() {
         onToggleManual={(open) => setShowManualConfig(open)}
       />
 
-      {/* 5 Last Connected Servers Quick Selector */}
+      {/* Saved Servers List */}
       {serverHistory.length > 0 && (
         <View style={styles.historySection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionHeader, { color: colors.primary }]}>
-              SAVED SERVERS (LAST {serverHistory.length} OF 5)
-            </Text>
-            <Text style={[styles.quickHint, { color: colors.outline }]}>
-              Tap to switch
-            </Text>
-          </View>
+          <Text style={[styles.sectionHeader, { color: colors.primary }]}>
+            SAVED SERVERS
+          </Text>
 
           {serverHistory.map((srv, idx) => {
             const isCurrent =
@@ -291,23 +255,20 @@ export default function SyncScreen() {
                     name="dns"
                     size={20}
                     color={
-                      isCurrent
-                        ? colors.onSecondary
-                        : colors.onPrimaryContainer
+                      isCurrent ? colors.onSecondary : colors.onPrimaryContainer
                     }
                   />
                 </View>
 
-                <View style={styles.historyContent}>
+                <View style={styles.historyInfo}>
                   <View style={styles.historyTopRow}>
                     <Text
                       style={[
-                        styles.historyIp,
+                        styles.historyAddress,
                         {
                           color: isCurrent
                             ? colors.onSecondaryContainer
                             : colors.onSurface,
-                          fontWeight: isCurrent ? "800" : "600",
                         },
                       ]}
                     >
@@ -316,32 +277,16 @@ export default function SyncScreen() {
                     {isCurrent && (
                       <M3Badge
                         label="ACTIVE"
-                        variant="primary"
+                        variant="secondary"
                         size="small"
-                        style={{ marginLeft: "auto" }}
+                        style={{ marginLeft: Spacing.one }}
                       />
                     )}
                   </View>
-                  <View style={styles.historyBottomRow}>
-                    {srv.driveName ? (
-                      <Text
-                        style={[styles.driveLabel, { color: colors.primary }]}
-                      >
-                        Drive: {srv.driveName}
-                      </Text>
-                    ) : (
-                      <Text
-                        style={[styles.driveLabel, { color: colors.outline }]}
-                      >
-                        External Media Organizer
-                      </Text>
-                    )}
-                    {srv.lastConnectedAt && (
-                      <Text style={[styles.timeAgo, { color: colors.outline }]}>
-                        • {formatRelativeTime(srv.lastConnectedAt)}
-                      </Text>
-                    )}
-                  </View>
+                  <Text style={[styles.historyMeta, { color: colors.outline }]}>
+                    {srv.driveName ? `${srv.driveName} • ` : ""}
+                    {formatRelativeTime(srv.lastConnectedAt)}
+                  </Text>
                 </View>
 
                 <Pressable
@@ -349,7 +294,7 @@ export default function SyncScreen() {
                     e.stopPropagation();
                     handleDeleteHistoryServer(srv.ip, srv.port);
                   }}
-                  hitSlop={12}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={styles.deleteBtn}
                 >
                   <MaterialIcons
@@ -364,137 +309,80 @@ export default function SyncScreen() {
         </View>
       )}
 
-      {/* Server Configuration Card (Manual IP & Port) */}
-      {showManualConfig ? (
+      {/* Manual Connection Card (Collapsible) */}
+      {showManualConfig && (
         <M3Card variant="elevated" style={styles.configCard}>
           <View style={styles.cardHeader}>
-            <MaterialIcons name="settings-ethernet" size={22} color={colors.primary} />
+            <MaterialIcons name="tune" size={20} color={colors.primary} />
             <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-              Manual Server Configuration
+              Manual Connection
             </Text>
-            <M3Badge
-              label="MANUAL"
-              variant="secondary"
-              size="small"
-              style={{ marginLeft: "auto" }}
-            />
           </View>
 
-          <Text
-            style={[
-              styles.prefDesc,
-              { color: colors.onSurfaceVariant, marginBottom: Spacing.two },
-            ]}
-          >
-            Use manual configuration if your server is on a different subnet, VPN, or if LAN discovery was unable to locate it.
-          </Text>
-
-          <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
-            Desktop Host IP Address
-          </Text>
-          <View
-            style={[
-              styles.inputBox,
-              {
-                backgroundColor: colors.surfaceContainerHighest,
-                borderColor: colors.outlineVariant,
-              },
-            ]}
-          >
-            <TextInput
-              value={inputIp}
-              onChangeText={setInputIp}
-              placeholder="192.168.1.100"
-              placeholderTextColor={colors.outline}
-              style={[styles.input, { color: colors.onSurface }]}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <Text
-            style={[
-              styles.inputLabel,
-              { color: colors.onSurfaceVariant, marginTop: Spacing.two },
-            ]}
-          >
-            Server Port
-          </Text>
-          <View
-            style={[
-              styles.inputBox,
-              {
-                backgroundColor: colors.surfaceContainerHighest,
-                borderColor: colors.outlineVariant,
-              },
-            ]}
-          >
-            <TextInput
-              value={inputPort}
-              onChangeText={setInputPort}
-              placeholder="8080"
-              placeholderTextColor={colors.outline}
-              style={[styles.input, { color: colors.onSurface }]}
-              keyboardType="number-pad"
-            />
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.buttonRow}>
-            <M3Button
-              label="Test Connection"
-              icon="wifi"
-              variant="outlined"
-              loading={status === "testing"}
-              onPress={handleApplyAndTest}
-              style={{ flex: 1, marginRight: Spacing.two }}
-            />
-            <M3Button
-              label={status === "downloading" ? "Downloading..." : "Download DB"}
-              icon="cloud-download"
-              variant="filled"
-              loading={status === "downloading" || status === "migrating"}
-              onPress={handleSyncPress}
-              style={{ flex: 1 }}
-            />
-          </View>
-        </M3Card>
-      ) : (
-        <M3Card variant="elevated" style={styles.configCard}>
-          <View style={styles.cardHeader}>
-            <MaterialIcons name="dns" size={22} color={colors.primary} />
-            <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-              Current Target Server
-            </Text>
-            <Pressable
-              onPress={() => setShowManualConfig(true)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={{ marginLeft: "auto", flexDirection: "row", alignItems: "center" }}
-            >
-              <MaterialIcons name="edit" size={14} color={colors.primary} style={{ marginRight: 4 }} />
-              <Text style={{ fontSize: 12, fontWeight: "700", color: colors.primary }}>
-                Edit IP
+          <View style={styles.formRow}>
+            <View style={{ flex: 3, marginRight: Spacing.two }}>
+              <Text
+                style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}
+              >
+                IP Address
               </Text>
-            </Pressable>
-          </View>
+              <TextInput
+                value={inputIp}
+                onChangeText={setInputIp}
+                placeholder="192.168.1.100"
+                placeholderTextColor={colors.outline}
+                keyboardType="numeric"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surfaceContainerHighest,
+                    borderColor: colors.outlineVariant,
+                    color: colors.onSurface,
+                  },
+                ]}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
 
-          <Text style={[styles.targetAddressText, { color: colors.onSurface }]}>
-            {inputIp}:{inputPort}
-          </Text>
+            <View style={{ flex: 1.5 }}>
+              <Text
+                style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}
+              >
+                Port
+              </Text>
+              <TextInput
+                value={inputPort}
+                onChangeText={setInputPort}
+                placeholder="8080"
+                placeholderTextColor={colors.outline}
+                keyboardType="numeric"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.surfaceContainerHighest,
+                    borderColor: colors.outlineVariant,
+                    color: colors.onSurface,
+                  },
+                ]}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
 
           <View style={styles.buttonRow}>
             <M3Button
-              label="Test Connection"
-              icon="wifi"
+              label={status === "testing" ? "Testing..." : "Test Connection"}
+              icon="wifi-find"
               variant="outlined"
               loading={status === "testing"}
               onPress={handleApplyAndTest}
               style={{ flex: 1, marginRight: Spacing.two }}
             />
             <M3Button
-              label={status === "downloading" ? "Downloading..." : "Download DB"}
-              icon="cloud-download"
+              label={status === "downloading" ? "Syncing..." : "Sync DB"}
+              icon="sync"
               variant="filled"
               loading={status === "downloading" || status === "migrating"}
               onPress={handleSyncPress}
@@ -504,54 +392,28 @@ export default function SyncScreen() {
         </M3Card>
       )}
 
-      {/* Dynamic Material Theme & Color Customizer Card */}
-      <M3Card variant="elevated" style={styles.configCard}>
+      {/* Appearance & Color Scheme Card */}
+      <M3Card variant="elevated" style={styles.prefCard}>
         <View style={styles.cardHeader}>
-          <MaterialIcons name="palette" size={22} color={colors.primary} />
+          <MaterialIcons name="palette" size={20} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-            Dynamic Material 3 Color
+            Theme & Appearance
           </Text>
-          <M3Badge
-            label={
-              themeAccent === "system"
-                ? isDynamicSupported
-                  ? "EXPO UI MATERIAL YOU"
-                  : "EXPO UI DYNAMIC"
-                : "CUSTOM SEED"
-            }
-            variant="primary"
-            size="small"
-            style={{ marginLeft: "auto" }}
-          />
         </View>
 
-        <Text
-          style={[
-            styles.prefDesc,
-            { color: colors.onSurfaceVariant, marginBottom: Spacing.three },
-          ]}
-        >
-          Powered by Expo UI dynamic Material 3 engine. Experience authentic
-          tonal elevations, wallpaper palette extraction on Android 12+, and
-          tonal palette generation.
-        </Text>
-
-        {/* Theme Mode Selector (System, Light, Dark) */}
-        <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
-          Appearance Mode
-        </Text>
+        {/* Theme Mode Switcher */}
         <View
           style={[
             styles.themeModeRow,
             {
-              backgroundColor: colors.surfaceContainer,
+              backgroundColor: colors.surfaceContainerLow,
               borderColor: colors.outlineVariant,
             },
           ]}
         >
           {(
             [
-              { mode: "system", label: "Auto", icon: "brightness-auto" },
+              { mode: "system", label: "System", icon: "brightness-auto" },
               { mode: "light", label: "Light", icon: "light-mode" },
               { mode: "dark", label: "Dark", icon: "dark-mode" },
             ] as const
@@ -567,9 +429,6 @@ export default function SyncScreen() {
                   {
                     backgroundColor: isSelected
                       ? colors.secondaryContainer
-                      : "transparent",
-                    borderColor: isSelected
-                      ? colors.secondary
                       : "transparent",
                   },
                   pressed && { opacity: 0.8 },
@@ -592,7 +451,7 @@ export default function SyncScreen() {
                       color: isSelected
                         ? colors.onSecondaryContainer
                         : colors.onSurfaceVariant,
-                      fontWeight: isSelected ? "800" : "500",
+                      fontWeight: isSelected ? "700" : "500",
                     },
                   ]}
                 >
@@ -604,14 +463,6 @@ export default function SyncScreen() {
         </View>
 
         {/* Accent Color Presets */}
-        <Text
-          style={[
-            styles.inputLabel,
-            { color: colors.onSurfaceVariant, marginTop: Spacing.two },
-          ]}
-        >
-          Dynamic Palette Seed
-        </Text>
         <View style={styles.presetGrid}>
           {THEME_ACCENT_PRESETS.map((preset) => {
             const isSelected = themeAccent === preset.id;
@@ -638,9 +489,7 @@ export default function SyncScreen() {
                     styles.colorDot,
                     {
                       backgroundColor:
-                        preset.id === "system"
-                          ? colors.primary
-                          : preset.color,
+                        preset.id === "system" ? colors.primary : preset.color,
                     },
                   ]}
                 >
@@ -659,7 +508,7 @@ export default function SyncScreen() {
                       color: isSelected
                         ? colors.onSecondaryContainer
                         : colors.onSurface,
-                      fontWeight: isSelected ? "800" : "600",
+                      fontWeight: isSelected ? "700" : "500",
                     },
                   ]}
                 >
@@ -669,98 +518,30 @@ export default function SyncScreen() {
             );
           })}
         </View>
-
-        {/* Live M3 Color Palette Swatches */}
-        <View
-          style={[
-            styles.tonalPreviewBox,
-            {
-              backgroundColor: colors.surfaceContainerLow,
-              borderColor: colors.outlineVariant,
-            },
-          ]}
-        >
-          <Text style={[styles.previewTitle, { color: colors.onSurfaceVariant }]}>
-            ACTIVE TONAL SCHEME PREVIEW
-          </Text>
-          <View style={styles.swatchRow}>
-            <View
-              style={[
-                styles.swatchItem,
-                { backgroundColor: colors.primary },
-              ]}
-            >
-              <Text style={[styles.swatchText, { color: colors.onPrimary }]}>
-                Primary
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.swatchItem,
-                { backgroundColor: colors.primaryContainer },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.swatchText,
-                  { color: colors.onPrimaryContainer },
-                ]}
-              >
-                Container
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.swatchItem,
-                { backgroundColor: colors.secondary },
-              ]}
-            >
-              <Text style={[styles.swatchText, { color: colors.onSecondary }]}>
-                Secondary
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.swatchItem,
-                { backgroundColor: colors.tertiary },
-              ]}
-            >
-              <Text style={[styles.swatchText, { color: colors.onTertiary }]}>
-                Tertiary
-              </Text>
-            </View>
-          </View>
-        </View>
       </M3Card>
 
-      {/* Play as Shorts / Reels Preference Card */}
+      {/* Play as Shorts / Reels Card */}
       <M3Card variant="elevated" style={styles.prefCard}>
-        <View style={styles.cardHeader}>
-          <MaterialIcons name="movie-filter" size={22} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-            Play as Shorts / Reels
-          </Text>
-          <M3Badge
-            label={playAsShorts ? "SHORTS ENABLED" : "STANDARD"}
-            variant={playAsShorts ? "primary" : "surface"}
-            size="small"
-            style={{ marginLeft: "auto" }}
-          />
-        </View>
-
         <View style={styles.switchRow}>
           <View style={{ flex: 1, marginRight: Spacing.two }}>
-            <Text style={[styles.switchTitle, { color: colors.onSurface }]}>
-              TikTok & Reels Vertical Player
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <MaterialIcons
+                name="movie-filter"
+                size={20}
+                color={colors.primary}
+                style={{ marginRight: Spacing.one }}
+              />
+              <Text style={[styles.switchTitle, { color: colors.onSurface }]}>
+                Play as Shorts / Reels
+              </Text>
+            </View>
             <Text
               style={[
                 styles.prefDesc,
-                { color: colors.onSurfaceVariant, marginTop: Spacing.one / 2 },
+                { color: colors.onSurfaceVariant, marginTop: 4 },
               ]}
             >
-              When tapping media or albums, stream directly in full-screen vertical
-              reels with swipe-to-next, auto-looping playback, and album-isolated navigation.
+              Full-screen vertical reels player with swipe-to-next.
             </Text>
           </View>
           <Switch
@@ -775,57 +556,36 @@ export default function SyncScreen() {
         </View>
       </M3Card>
 
-      {/* Media Download Storage Directory Card */}
+      {/* Download Storage Location Card */}
       <M3Card variant="elevated" style={styles.prefCard}>
         <View style={styles.cardHeader}>
-          <MaterialIcons name="folder-special" size={22} color={colors.primary} />
+          <MaterialIcons name="folder" size={20} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-            Media Storage Folder
+            Download Directory
           </Text>
-          <M3Badge
-            label={`${downloadedCount} DOWNLOADED`}
-            variant="secondary"
-            size="small"
-            style={{ marginLeft: "auto" }}
-          />
         </View>
 
-        <Text
+        <TextInput
+          value={inputDlLocation}
+          onChangeText={setInputDlLocation}
+          placeholder="d-stream-downloads"
+          placeholderTextColor={colors.outline}
           style={[
-            styles.prefDesc,
-            { color: colors.onSurfaceVariant, marginBottom: Spacing.two },
-          ]}
-        >
-          Folder name where full-resolution media files and offline albums are
-          saved in your device Documents storage.
-        </Text>
-
-        <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
-          Relative Folder Name
-        </Text>
-        <View
-          style={[
-            styles.inputBox,
+            styles.input,
             {
               backgroundColor: colors.surfaceContainerHighest,
               borderColor: colors.outlineVariant,
+              color: colors.onSurface,
+              marginBottom: Spacing.two,
             },
           ]}
-        >
-          <TextInput
-            value={inputDlLocation}
-            onChangeText={setInputDlLocation}
-            placeholder={DEFAULT_DOWNLOAD_LOCATION}
-            placeholderTextColor={colors.outline}
-            style={[styles.input, { color: colors.onSurface }]}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
         <View style={styles.buttonRow}>
           <M3Button
-            label="Save Folder"
+            label="Save"
             icon="check"
             variant="filled"
             onPress={handleSaveDownloadLocation}
@@ -840,29 +600,16 @@ export default function SyncScreen() {
         </View>
       </M3Card>
 
-      {/* Media Gallery Page Size Preference Card */}
+      {/* Gallery Page Size Card */}
       <M3Card variant="elevated" style={styles.prefCard}>
         <View style={styles.cardHeader}>
-          <MaterialIcons name="view-module" size={22} color={colors.primary} />
+          <MaterialIcons name="view-module" size={20} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-            Gallery Page Size
-          </Text>
-          <Text style={[styles.quickHint, { color: colors.outline }]}>
-            LegendList Virtualization
+            Items per Page
           </Text>
         </View>
 
-        <Text style={[styles.prefDesc, { color: colors.onSurfaceVariant }]}>
-          Select how many items are loaded per page for infinite scroll and
-          memory efficiency.
-        </Text>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.pageSizePillsContainer}
-          style={{ marginTop: Spacing.two }}
-        >
+        <View style={styles.pageSizeRow}>
           {PAGE_SIZE_OPTIONS.map((size) => {
             const isSelected = (pageSize || 96) === size;
             return (
@@ -894,124 +641,74 @@ export default function SyncScreen() {
                     },
                   ]}
                 >
-                  {size} items
+                  {size}
                 </Text>
-                {size === 96 && (
-                  <Text
-                    style={[styles.defaultTag, { color: colors.outline }]}
-                  >
-                    Recommended
-                  </Text>
-                )}
               </Pressable>
             );
           })}
-        </ScrollView>
+        </View>
       </M3Card>
 
-      {/* Local SQLite Database Inspector Card */}
+      {/* Local SQLite Database Snapshot Card */}
       <M3Card variant="elevated" style={styles.dbInfoCard}>
         <View style={styles.cardHeader}>
-          <MaterialIcons name="storage" size={22} color={colors.primary} />
+          <MaterialIcons name="storage" size={20} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
-            Local SQLite Snapshot
+            Local Database
           </Text>
+          {lastSyncTime && (
+            <Text style={[styles.lastSyncHint, { color: colors.outline }]}>
+              {formatRelativeTime(lastSyncTime)}
+            </Text>
+          )}
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.dbStatCol}>
-            <Text
-              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
-            >
-              MEDIA ITEMS
-            </Text>
             <Text style={[styles.dbStatVal, { color: colors.primary }]}>
               {stats.total_items.toLocaleString()}
             </Text>
-          </View>
-
-          <View style={styles.dbStatCol}>
             <Text
               style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
             >
-              ALBUMS
+              Items
             </Text>
+          </View>
+
+          <View style={styles.dbStatCol}>
             <Text style={[styles.dbStatVal, { color: colors.primary }]}>
               {stats.albums.toLocaleString()}
             </Text>
-          </View>
-
-          <View style={styles.dbStatCol}>
             <Text
               style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
             >
-              TAGS
+              Albums
             </Text>
+          </View>
+
+          <View style={styles.dbStatCol}>
             <Text style={[styles.dbStatVal, { color: colors.primary }]}>
               {stats.tags.toLocaleString()}
             </Text>
-          </View>
-
-          <View style={styles.dbStatCol}>
             <Text
               style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
             >
-              DB SIZE
+              Tags
             </Text>
+          </View>
+
+          <View style={styles.dbStatCol}>
             <Text style={[styles.dbStatVal, { color: colors.primary }]}>
               {stats.db_size_formatted || "0 B"}
             </Text>
+            <Text
+              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
+            >
+              Size
+            </Text>
           </View>
         </View>
-
-        {lastSyncTime && (
-          <Text style={[styles.lastSyncLabel, { color: colors.outline }]}>
-            Last Snapshot: {new Date(lastSyncTime).toLocaleString()}
-          </Text>
-        )}
       </M3Card>
-
-      {/* Frequently Asked Questions */}
-      <View style={styles.faqSection}>
-        <Text
-          style={[
-            styles.sectionHeader,
-            { color: colors.primary, marginBottom: Spacing.two },
-          ]}
-        >
-          FREQUENTLY ASKED QUESTIONS
-        </Text>
-
-        {faqs.map((faq, index) => {
-          const isExpanded = expandedFaq === index;
-          return (
-            <M3Card
-              key={index}
-              variant="outlined"
-              onPress={() => setExpandedFaq(isExpanded ? null : index)}
-              style={{ marginBottom: Spacing.two }}
-            >
-              <View style={styles.faqHeader}>
-                <Text style={[styles.faqQuestion, { color: colors.onSurface }]}>
-                  {faq.q}
-                </Text>
-                <MaterialIcons
-                  name={isExpanded ? "expand-less" : "expand-more"}
-                  size={22}
-                  color={colors.onSurfaceVariant}
-                />
-              </View>
-              {isExpanded && (
-                <Text
-                  style={[styles.faqAnswer, { color: colors.onSurfaceVariant }]}
-                >
-                  {faq.a}
-                </Text>
-              )}
-            </M3Card>
-          );
-        })}
-      </View>
     </ScrollView>
   );
 }
@@ -1042,59 +739,43 @@ const styles = StyleSheet.create({
   historySection: {
     marginBottom: Spacing.three,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.one,
-  },
   sectionHeader: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8,
-  },
-  quickHint: {
-    fontSize: 11,
-    fontWeight: "500",
+    marginBottom: Spacing.two,
   },
   historyCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: Spacing.two,
+    padding: Spacing.two + 2,
     borderRadius: Shapes.medium,
     borderWidth: 1,
-    marginBottom: Spacing.one,
+    marginBottom: Spacing.one + 2,
   },
   historyIconBox: {
     width: 38,
     height: 38,
-    borderRadius: Shapes.small,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.two,
   },
-  historyContent: {
+  historyInfo: {
     flex: 1,
   },
   historyTopRow: {
     flexDirection: "row",
     alignItems: "center",
   },
-  historyIp: {
+  historyAddress: {
     fontSize: 14,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
-  historyBottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
+  historyMeta: {
+    fontSize: 12,
     marginTop: 2,
-  },
-  driveLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  timeAgo: {
-    fontSize: 11,
-    marginLeft: 4,
   },
   deleteBtn: {
     padding: Spacing.one,
@@ -1102,30 +783,44 @@ const styles = StyleSheet.create({
   },
   configCard: {
     marginBottom: Spacing.three,
-  },
-  targetAddressText: {
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 0.3,
-    marginBottom: Spacing.two,
-    fontVariant: ["tabular-nums"],
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Spacing.one,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: "700",
+    padding: Spacing.three + 2,
   },
   prefCard: {
     marginBottom: Spacing.three,
+    padding: Spacing.three + 2,
   },
-  prefDesc: {
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.two,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginLeft: Spacing.two,
+  },
+  lastSyncHint: {
+    marginLeft: "auto",
     fontSize: 12,
-    lineHeight: 17,
+  },
+  formRow: {
+    flexDirection: "row",
+    marginBottom: Spacing.three,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  input: {
+    height: 46,
+    borderRadius: Shapes.medium,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.two + 2,
+    fontSize: 14,
+  },
+  buttonRow: {
+    flexDirection: "row",
   },
   themeModeRow: {
     flexDirection: "row",
@@ -1139,7 +834,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: Shapes.small,
   },
   themeModeText: {
@@ -1148,21 +843,20 @@ const styles = StyleSheet.create({
   presetGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginBottom: Spacing.three,
+    gap: Spacing.one + 2,
   },
   presetChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Shapes.large,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: Shapes.full,
     borderWidth: 1,
   },
   colorDot: {
     width: 14,
     height: 14,
-    borderRadius: Shapes.full,
+    borderRadius: 7,
     marginRight: 6,
     alignItems: "center",
     justifyContent: "center",
@@ -1170,126 +864,56 @@ const styles = StyleSheet.create({
   presetLabel: {
     fontSize: 12,
   },
-  tonalPreviewBox: {
-    padding: Spacing.three,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-  },
-  previewTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-    marginBottom: Spacing.two,
-  },
-  swatchRow: {
+  switchRow: {
     flexDirection: "row",
-    gap: Spacing.two,
-  },
-  swatchItem: {
-    flex: 1,
-    paddingVertical: Spacing.two,
-    borderRadius: Shapes.small,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
   },
-  swatchText: {
-    fontSize: 11,
+  switchTitle: {
+    fontSize: 14,
     fontWeight: "700",
   },
-  pageSizePillsContainer: {
+  prefDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  pageSizeRow: {
     flexDirection: "row",
-    alignItems: "center",
     gap: Spacing.two,
-    paddingVertical: 4,
   },
   prefSizePill: {
-    paddingHorizontal: 14,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
     borderRadius: Shapes.medium,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   prefSizeText: {
-    fontSize: 13,
-  },
-  defaultTag: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.two,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginLeft: Spacing.two,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: Spacing.one,
-  },
-  inputBox: {
-    height: 48,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.three,
-    justifyContent: "center",
-  },
-  input: {
-    fontSize: 15,
-    height: 48,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    marginTop: Spacing.three,
+    fontSize: 14,
   },
   dbInfoCard: {
     marginBottom: Spacing.three,
+    padding: Spacing.three + 2,
   },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
+    alignItems: "center",
+    paddingTop: Spacing.one,
   },
   dbStatCol: {
     alignItems: "center",
-  },
-  dbStatLabel: {
-    fontSize: 10,
-    fontWeight: "700",
+    flex: 1,
   },
   dbStatVal: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800",
-    marginTop: 4,
+    fontVariant: ["tabular-nums"],
   },
-  lastSyncLabel: {
+  dbStatLabel: {
     fontSize: 11,
-    textAlign: "center",
-    marginTop: Spacing.two,
-  },
-  faqSection: {
-    marginTop: Spacing.two,
-  },
-  faqHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  faqQuestion: {
-    fontSize: 13,
-    fontWeight: "700",
-    flex: 1,
-    marginRight: Spacing.two,
-  },
-  faqAnswer: {
-    fontSize: 12,
-    marginTop: Spacing.two,
-    lineHeight: 18,
+    fontWeight: "600",
+    marginTop: 2,
   },
 });

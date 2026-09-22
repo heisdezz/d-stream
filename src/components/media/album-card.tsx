@@ -16,13 +16,13 @@ export interface AlbumCardProps {
   serverPort?: number;
 }
 
-export const AlbumCard: React.FC<AlbumCardProps> = ({
+export const AlbumCard = React.memo(function AlbumCard({
   album,
   onPress,
   width,
   serverIp,
   serverPort = 8080,
-}) => {
+}: AlbumCardProps) {
   const { colors } = useMaterialTheme();
   const [imageError, setImageError] = useState(false);
 
@@ -118,7 +118,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({
       </View>
     </Pressable>
   );
-};
+});
 
 const styles = StyleSheet.create({
   card: {
