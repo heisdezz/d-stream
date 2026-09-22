@@ -23,6 +23,7 @@ import { MediaGridItem } from "@/components/media/media-grid-item";
 import { AlbumCard } from "@/components/media/album-card";
 import { MediaItem } from "@/types/models";
 import { MaterialIcons } from "@expo/vector-icons";
+import tw from "twrnc";
 
 function formatLastSync(iso?: string): string {
   if (!iso) return "Never";
@@ -96,7 +97,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[tw`flex-1`, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.contentContainer,
         { paddingBottom: insets.bottom + Spacing.seven },
@@ -111,12 +112,22 @@ export default function HomeScreen() {
       }
     >
       {/* Clean Top Header */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandingBox}>
-          <Text style={[styles.appTitle, { color: colors.onBackground }]}>
+      <View style={tw`flex-row items-center justify-between mb-4`}>
+        <View style={tw`flex-1`}>
+          <Text
+            style={[
+              tw`text-2xl font-black tracking-tighter`,
+              { color: colors.onBackground },
+            ]}
+          >
             d-stream
           </Text>
-          <Text style={[styles.appSubtitle, { color: colors.outline }]}>
+          <Text
+            style={[
+              tw`text-xs font-semibold mt-0.5`,
+              { color: colors.outline },
+            ]}
+          >
             {serverInfo?.drive_name || "Local Media Streamer"}
           </Text>
         </View>
@@ -124,7 +135,7 @@ export default function HomeScreen() {
         <Pressable
           onPress={() => router.push("/sync")}
           style={({ pressed }) => [
-            styles.serverBadgeBtn,
+            tw`flex-row items-center px-3 py-1.5 rounded-full border`,
             {
               backgroundColor:
                 syncStatus === "connected"
@@ -140,7 +151,7 @@ export default function HomeScreen() {
         >
           <View
             style={[
-              styles.statusDot,
+              tw`w-2 h-2 rounded-full mr-1.5`,
               {
                 backgroundColor:
                   syncStatus === "connected"
@@ -153,7 +164,7 @@ export default function HomeScreen() {
           />
           <Text
             style={[
-              styles.serverBadgeText,
+              tw`text-xs font-bold`,
               {
                 color:
                   syncStatus === "connected"
@@ -174,7 +185,7 @@ export default function HomeScreen() {
           router.push("/media");
         }}
         style={({ pressed }) => [
-          styles.quickSearchPill,
+          tw`flex-row items-center px-4 h-11 rounded-full border mb-4`,
           {
             backgroundColor: colors.surfaceContainerHigh,
             borderColor: colors.outlineVariant,
@@ -186,26 +197,26 @@ export default function HomeScreen() {
           name="search"
           size={20}
           color={colors.onSurfaceVariant}
-          style={{ marginRight: Spacing.two }}
+          style={tw`mr-2`}
         />
-        <Text style={[styles.quickSearchText, { color: colors.outline }]}>
+        <Text style={[tw`text-sm`, { color: colors.outline }]}>
           Search photos, videos, albums...
         </Text>
       </Pressable>
 
       {/* Sync Progress Bar */}
       {syncProgress && (
-        <M3Card variant="outlined" style={{ marginBottom: Spacing.three }}>
+        <M3Card variant="outlined" style={tw`mb-4`}>
           <SyncProgressBar progress={syncProgress} />
         </M3Card>
       )}
 
       {/* Unified Hero Library Hub Card */}
-      <M3Card variant="elevated" style={styles.heroHubCard}>
-        <View style={styles.heroTopRow}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-4`}>
           <View
             style={[
-              styles.heroDriveIcon,
+              tw`w-11 h-11 rounded-full items-center justify-center mr-3`,
               { backgroundColor: colors.primaryContainer },
             ]}
           >
@@ -216,17 +227,22 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={styles.heroTitleCol}>
+          <View style={tw`flex-1`}>
             <Text
-              style={[styles.heroDriveName, { color: colors.onSurface }]}
+              style={[
+                tw`text-base font-extrabold`,
+                { color: colors.onSurface },
+              ]}
               numberOfLines={1}
             >
               {serverInfo?.drive_name ||
                 (hasDatabase ? "Local Media Library" : "No Drive Connected")}
             </Text>
-            <Text style={[styles.heroSyncTime, { color: colors.outline }]}>
+            <Text style={[tw`text-xs mt-0.5`, { color: colors.outline }]}>
               {stats.total_items > 0
-                ? `${stats.total_items.toLocaleString()} media items • Synced ${formatLastSync(lastSyncTime || undefined)}`
+                ? `${stats.total_items.toLocaleString()} media items • Synced ${formatLastSync(
+                    lastSyncTime || undefined,
+                  )}`
                 : "Connect & sync to stream"}
             </Text>
           </View>
@@ -236,17 +252,17 @@ export default function HomeScreen() {
               label="READY"
               variant="primary"
               size="small"
-              style={{ marginLeft: "auto" }}
+              style={tw`ml-auto`}
             />
           )}
         </View>
 
         {/* Quick Category Counters */}
-        <View style={styles.categoryRow}>
+        <View style={tw`flex-row gap-2 mb-4`}>
           <Pressable
             onPress={() => handleCategoryPress("image")}
             style={({ pressed }) => [
-              styles.categoryPill,
+              tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
@@ -255,9 +271,7 @@ export default function HomeScreen() {
             ]}
           >
             <MaterialIcons name="image" size={18} color={colors.primary} />
-            <Text
-              style={[styles.categoryPillText, { color: colors.onSurface }]}
-            >
+            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
               {stats.images.toLocaleString()} Photos
             </Text>
           </Pressable>
@@ -265,7 +279,7 @@ export default function HomeScreen() {
           <Pressable
             onPress={() => handleCategoryPress("video")}
             style={({ pressed }) => [
-              styles.categoryPill,
+              tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
@@ -274,9 +288,7 @@ export default function HomeScreen() {
             ]}
           >
             <MaterialIcons name="videocam" size={18} color={colors.tertiary} />
-            <Text
-              style={[styles.categoryPillText, { color: colors.onSurface }]}
-            >
+            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
               {stats.videos.toLocaleString()} Videos
             </Text>
           </Pressable>
@@ -284,7 +296,7 @@ export default function HomeScreen() {
           <Pressable
             onPress={() => router.push("/albums")}
             style={({ pressed }) => [
-              styles.categoryPill,
+              tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
@@ -297,16 +309,14 @@ export default function HomeScreen() {
               size={18}
               color={colors.secondary}
             />
-            <Text
-              style={[styles.categoryPillText, { color: colors.onSurface }]}
-            >
+            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
               {stats.albums.toLocaleString()} Albums
             </Text>
           </Pressable>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.heroActions}>
+        <View style={tw`flex-row items-center`}>
           <M3Button
             label={syncStatus === "downloading" ? "Syncing..." : "Sync DB"}
             icon="sync"
@@ -314,7 +324,7 @@ export default function HomeScreen() {
             size="medium"
             loading={syncStatus === "downloading" || syncStatus === "migrating"}
             onPress={handleSyncPress}
-            style={{ flex: 1, marginRight: Spacing.two }}
+            style={tw`flex-1 mr-2`}
           />
 
           {recentMedia.length > 0 && (
@@ -329,7 +339,7 @@ export default function HomeScreen() {
                   params: { mediaId: recentMedia[0].id.toString() },
                 });
               }}
-              style={{ marginRight: Spacing.two }}
+              style={tw`mr-2`}
             />
           )}
 
@@ -345,9 +355,14 @@ export default function HomeScreen() {
 
       {/* Top Collections Carousel */}
       {albums.length > 0 && (
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+        <View style={tw`mb-4`}>
+          <View style={tw`flex-row items-center justify-between mb-2`}>
+            <Text
+              style={[
+                tw`text-base font-extrabold tracking-tight`,
+                { color: colors.onSurface },
+              ]}
+            >
               Collections
             </Text>
             <M3Button
@@ -371,9 +386,14 @@ export default function HomeScreen() {
       )}
 
       {/* Recent Media Section */}
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>
+      <View style={tw`mb-4`}>
+        <View style={tw`flex-row items-center justify-between mb-2`}>
+          <Text
+            style={[
+              tw`text-base font-extrabold tracking-tight`,
+              { color: colors.onSurface },
+            ]}
+          >
             Recent Media
           </Text>
           {recentMedia.length > 0 && (
@@ -387,13 +407,24 @@ export default function HomeScreen() {
         </View>
 
         {!hasDatabase && stats.total_items === 0 ? (
-          <M3Card variant="filled" style={styles.emptySetupCard}>
+          <M3Card
+            variant="filled"
+            style={tw`p-6 items-center justify-center rounded-2xl`}
+          >
             <MaterialIcons name="cloud-sync" size={40} color={colors.primary} />
-            <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+            <Text
+              style={[
+                tw`text-base font-bold mt-2`,
+                { color: colors.onSurface },
+              ]}
+            >
               No Media Synced
             </Text>
             <Text
-              style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-xs text-center mt-1 max-w-[280px]`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Connect to your desktop server over local Wi-Fi to load your media
               library.
@@ -402,12 +433,12 @@ export default function HomeScreen() {
               label="Connect Server"
               icon="sync"
               variant="filled"
-              style={{ marginTop: Spacing.three }}
+              style={tw`mt-4`}
               onPress={() => router.push("/sync")}
             />
           </M3Card>
         ) : (
-          <View style={styles.recentGrid}>
+          <View style={tw`flex-row flex-wrap gap-2`}>
             {recentMedia.map((item) => (
               <MediaGridItem
                 key={item.id}
@@ -426,150 +457,10 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   contentContainer: {
     padding: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: "center",
     width: "100%",
-  },
-  topHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.three,
-  },
-  brandingBox: {
-    flex: 1,
-  },
-  appTitle: {
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-  },
-  appSubtitle: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  serverBadgeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Shapes.full,
-    borderWidth: 1,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  serverBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  quickSearchPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.three,
-    height: 46,
-    borderRadius: Shapes.full,
-    borderWidth: 1,
-    marginBottom: Spacing.three,
-  },
-  quickSearchText: {
-    fontSize: 13,
-  },
-  heroHubCard: {
-    padding: Spacing.three + 2,
-    marginBottom: Spacing.four,
-  },
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.three,
-  },
-  heroDriveIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: Spacing.two,
-  },
-  heroTitleCol: {
-    flex: 1,
-  },
-  heroDriveName: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  heroSyncTime: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  categoryRow: {
-    flexDirection: "row",
-    gap: Spacing.two,
-    marginBottom: Spacing.three,
-  },
-  categoryPill: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-  },
-  categoryPillText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  heroActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionContainer: {
-    marginBottom: Spacing.three,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.two,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-  },
-  emptySetupCard: {
-    padding: Spacing.four,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: Shapes.large,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: Spacing.two,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: Spacing.one,
-    maxWidth: 280,
-  },
-  recentGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.two,
   },
 });

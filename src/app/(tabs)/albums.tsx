@@ -28,6 +28,7 @@ import { M3Badge } from "@/components/material/m3-badge";
 import { ScreenLoader } from "@/components/common/screen-loader";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Album, Tag } from "@/types/models";
+import tw from "twrnc";
 
 type CollectionTab = "albums" | "tags";
 
@@ -112,8 +113,6 @@ export default function AlbumsScreen() {
     }, {});
   }, [filteredTags]);
 
-  const isLoading = isAlbumsLoading || isTagsLoading;
-
   const renderAlbumItem = useCallback(
     ({ item }: { item: Album }) => (
       <AlbumCard
@@ -129,7 +128,12 @@ export default function AlbumsScreen() {
   const albumListHeader = useMemo(() => {
     if (filteredAlbums.length === 0) return null;
     return (
-      <Text style={[styles.sectionHeader, { color: colors.onSurfaceVariant }]}>
+      <Text
+        style={[
+          tw`text-xs font-extrabold tracking-wider mb-2 mt-1`,
+          { color: colors.onSurfaceVariant },
+        ]}
+      >
         {filteredAlbums.length}{" "}
         {filteredAlbums.length === 1 ? "ALBUM" : "ALBUMS"} AVAILABLE
       </Text>
@@ -139,14 +143,14 @@ export default function AlbumsScreen() {
   const isServerReady = hasDatabase || stats.total_items > 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[tw`flex-1`, { backgroundColor: colors.background }]}>
       {/* Top Controls */}
       <View style={styles.topBar}>
         <M3SegmentedRow
           items={collectionTabs}
           selectedValue={currentTab}
           onSelect={setCurrentTab}
-          style={{ marginBottom: Spacing.two }}
+          style={tw`mb-2`}
         />
 
         <M3SearchBar
@@ -162,13 +166,24 @@ export default function AlbumsScreen() {
 
       {!isServerReady ? (
         <View style={styles.emptyContainer}>
-          <M3Card variant="filled" style={styles.emptyCard}>
+          <M3Card
+            variant="filled"
+            style={tw`p-6 items-center justify-center rounded-2xl`}
+          >
             <MaterialIcons name="cloud-off" size={44} color={colors.outline} />
-            <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+            <Text
+              style={[
+                tw`text-base font-bold mt-2`,
+                { color: colors.onSurface },
+              ]}
+            >
               No Database Loaded
             </Text>
             <Text
-              style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-xs text-center mt-1`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Sync with your desktop organizer server to view albums and tags.
             </Text>
@@ -179,7 +194,7 @@ export default function AlbumsScreen() {
           {/* Albums Virtualized Tab View (Kept mounted for zero tab-switch lag) */}
           <View
             style={[
-              styles.tabPanel,
+              tw`flex-1 w-full`,
               { display: currentTab === "albums" ? "flex" : "none" },
             ]}
           >
@@ -190,13 +205,18 @@ export default function AlbumsScreen() {
                 icon="folder-special"
               />
             ) : filteredAlbums.length === 0 ? (
-              <View style={styles.emptyState}>
+              <View style={tw`py-12 items-center justify-center`}>
                 <MaterialIcons
                   name="folder-off"
                   size={44}
                   color={colors.outline}
                 />
-                <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+                <Text
+                  style={[
+                    tw`text-base font-bold mt-2`,
+                    { color: colors.onSurface },
+                  ]}
+                >
                   {searchQuery ? "No matching albums found" : "No albums found"}
                 </Text>
               </View>
@@ -229,7 +249,7 @@ export default function AlbumsScreen() {
           {/* Tags Tab View (Kept mounted for zero tab-switch lag) */}
           <View
             style={[
-              styles.tabPanel,
+              tw`flex-1 w-full`,
               { display: currentTab === "tags" ? "flex" : "none" },
             ]}
           >
@@ -240,19 +260,24 @@ export default function AlbumsScreen() {
                 icon="label"
               />
             ) : filteredTags.length === 0 ? (
-              <View style={styles.emptyState}>
+              <View style={tw`py-12 items-center justify-center`}>
                 <MaterialIcons
                   name="label-off"
                   size={44}
                   color={colors.outline}
                 />
-                <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
+                <Text
+                  style={[
+                    tw`text-base font-bold mt-2`,
+                    { color: colors.onSurface },
+                  ]}
+                >
                   {searchQuery ? "No matching tags found" : "No tags found"}
                 </Text>
               </View>
             ) : (
               <ScrollView
-                style={styles.scroll}
+                style={tw`flex-1`}
                 contentContainerStyle={[
                   styles.contentContainer,
                   { paddingBottom: insets.bottom + Spacing.seven },
@@ -267,19 +292,22 @@ export default function AlbumsScreen() {
                 }
               >
                 {Object.entries(tagsByCategory).map(([category, catTags]) => (
-                  <View key={category} style={styles.categorySection}>
+                  <View key={category} style={tw`mb-4`}>
                     <Text
-                      style={[styles.categoryHeader, { color: colors.primary }]}
+                      style={[
+                        tw`text-xs font-extrabold tracking-wider mb-2`,
+                        { color: colors.primary },
+                      ]}
                     >
                       {category.toUpperCase()}
                     </Text>
-                    <View style={styles.tagsCloud}>
+                    <View style={tw`flex-row flex-wrap gap-1.5`}>
                       {catTags.map((tag) => (
                         <Pressable
                           key={tag.id}
                           onPress={() => handleTagPress(tag)}
                           style={({ pressed }) => [
-                            styles.tagItem,
+                            tw`flex-row items-center py-1.5 px-3 rounded-full border`,
                             {
                               backgroundColor: colors.surfaceContainer,
                               borderColor:
@@ -290,7 +318,7 @@ export default function AlbumsScreen() {
                         >
                           <View
                             style={[
-                              styles.tagColorDot,
+                              tw`w-2 h-2 rounded-full mr-1.5`,
                               {
                                 backgroundColor:
                                   tag.color_hex || colors.primary,
@@ -299,7 +327,7 @@ export default function AlbumsScreen() {
                           />
                           <Text
                             style={[
-                              styles.tagName,
+                              tw`text-xs font-semibold`,
                               { color: colors.onSurface },
                             ]}
                           >
@@ -310,7 +338,7 @@ export default function AlbumsScreen() {
                               label={tag.media_count.toString()}
                               variant="surface"
                               size="small"
-                              style={{ marginLeft: Spacing.one }}
+                              style={tw`ml-1`}
                             />
                           )}
                         </Pressable>
@@ -328,9 +356,6 @@ export default function AlbumsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   topBar: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
@@ -338,13 +363,6 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: "center",
     width: "100%",
-  },
-  tabPanel: {
-    flex: 1,
-    width: "100%",
-  },
-  scroll: {
-    flex: 1,
   },
   contentContainer: {
     paddingHorizontal: Spacing.four,
@@ -358,65 +376,5 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: "center",
     width: "100%",
-  },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    marginBottom: Spacing.two,
-    marginTop: Spacing.one,
-  },
-  emptyState: {
-    paddingVertical: Spacing.seven,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyCard: {
-    padding: Spacing.four,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: Shapes.large,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: Spacing.two,
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    textAlign: "center",
-    marginTop: Spacing.one,
-  },
-  categorySection: {
-    marginBottom: Spacing.three,
-  },
-  categoryHeader: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1,
-    marginBottom: Spacing.one,
-  },
-  tagsCloud: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.one,
-  },
-  tagItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: Shapes.full,
-    borderWidth: 1,
-  },
-  tagColorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  tagName: {
-    fontSize: 13,
-    fontWeight: "600",
   },
 });

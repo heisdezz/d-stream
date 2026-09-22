@@ -31,6 +31,7 @@ import { LanServerScanner } from "@/components/sync/lan-server-scanner";
 import { DiscoveredServer } from "@/services/lan-discovery";
 import { MaterialIcons } from "@expo/vector-icons";
 import { toast } from "sonner-native";
+import tw from "twrnc";
 
 function formatRelativeTime(iso?: string): string {
   if (!iso) return "";
@@ -163,7 +164,7 @@ export default function SyncScreen() {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[tw`flex-1`, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.contentContainer,
         { paddingBottom: insets.bottom + Spacing.seven },
@@ -176,21 +177,29 @@ export default function SyncScreen() {
         serverPort={parseInt(inputPort, 10) || 8080}
         driveName={serverInfo?.drive_name}
         latencyMs={latencyMs}
-        style={{ marginBottom: Spacing.three }}
+        style={tw`mb-4`}
       />
 
       {/* Error Banner */}
       {errorMessage && (
         <M3Card
           variant="filled"
-          style={[styles.errorCard, { backgroundColor: colors.errorContainer }]}
+          style={[
+            tw`flex-row items-center p-3 rounded-xl mb-3`,
+            { backgroundColor: colors.errorContainer },
+          ]}
         >
           <MaterialIcons
             name="error-outline"
             size={20}
             color={colors.onErrorContainer}
           />
-          <Text style={[styles.errorText, { color: colors.onErrorContainer }]}>
+          <Text
+            style={[
+              tw`text-xs font-semibold ml-2 flex-1`,
+              { color: colors.onErrorContainer },
+            ]}
+          >
             {errorMessage}
           </Text>
         </M3Card>
@@ -198,7 +207,7 @@ export default function SyncScreen() {
 
       {/* Sync Progress */}
       {syncProgress && (
-        <M3Card variant="outlined" style={{ marginBottom: Spacing.three }}>
+        <M3Card variant="outlined" style={tw`mb-4`}>
           <SyncProgressBar progress={syncProgress} />
         </M3Card>
       )}
@@ -215,8 +224,13 @@ export default function SyncScreen() {
 
       {/* Saved Servers List */}
       {serverHistory.length > 0 && (
-        <View style={styles.historySection}>
-          <Text style={[styles.sectionHeader, { color: colors.primary }]}>
+        <View style={tw`mb-4`}>
+          <Text
+            style={[
+              tw`text-[11px] font-extrabold tracking-wider mb-2`,
+              { color: colors.primary },
+            ]}
+          >
             SAVED SERVERS
           </Text>
 
@@ -229,7 +243,7 @@ export default function SyncScreen() {
                 key={`${srv.ip}-${srv.port}-${idx}`}
                 onPress={() => handleSelectHistoryServer(srv.ip, srv.port)}
                 style={({ pressed }) => [
-                  styles.historyCard,
+                  tw`flex-row items-center p-2.5 rounded-xl border mb-2`,
                   {
                     backgroundColor: isCurrent
                       ? colors.secondaryContainer
@@ -243,7 +257,7 @@ export default function SyncScreen() {
               >
                 <View
                   style={[
-                    styles.historyIconBox,
+                    tw`w-9 h-9 rounded-full items-center justify-center mr-2.5`,
                     {
                       backgroundColor: isCurrent
                         ? colors.secondary
@@ -260,11 +274,11 @@ export default function SyncScreen() {
                   />
                 </View>
 
-                <View style={styles.historyInfo}>
-                  <View style={styles.historyTopRow}>
+                <View style={tw`flex-1`}>
+                  <View style={tw`flex-row items-center`}>
                     <Text
                       style={[
-                        styles.historyAddress,
+                        tw`text-sm font-bold`,
                         {
                           color: isCurrent
                             ? colors.onSecondaryContainer
@@ -279,11 +293,11 @@ export default function SyncScreen() {
                         label="ACTIVE"
                         variant="secondary"
                         size="small"
-                        style={{ marginLeft: Spacing.one }}
+                        style={tw`ml-2`}
                       />
                     )}
                   </View>
-                  <Text style={[styles.historyMeta, { color: colors.outline }]}>
+                  <Text style={[tw`text-xs mt-0.5`, { color: colors.outline }]}>
                     {srv.driveName ? `${srv.driveName} • ` : ""}
                     {formatRelativeTime(srv.lastConnectedAt)}
                   </Text>
@@ -295,7 +309,7 @@ export default function SyncScreen() {
                     handleDeleteHistoryServer(srv.ip, srv.port);
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={styles.deleteBtn}
+                  style={tw`p-1.5 ml-1`}
                 >
                   <MaterialIcons
                     name="close"
@@ -311,18 +325,23 @@ export default function SyncScreen() {
 
       {/* Manual Connection Card (Collapsible) */}
       {showManualConfig && (
-        <M3Card variant="elevated" style={styles.configCard}>
-          <View style={styles.cardHeader}>
+        <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+          <View style={tw`flex-row items-center mb-3`}>
             <MaterialIcons name="tune" size={20} color={colors.primary} />
-            <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+            <Text
+              style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}
+            >
               Manual Connection
             </Text>
           </View>
 
-          <View style={styles.formRow}>
-            <View style={{ flex: 3, marginRight: Spacing.two }}>
+          <View style={tw`flex-row mb-4`}>
+            <View style={tw`flex-3 mr-2`}>
               <Text
-                style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}
+                style={[
+                  tw`text-xs font-semibold mb-1.5`,
+                  { color: colors.onSurfaceVariant },
+                ]}
               >
                 IP Address
               </Text>
@@ -333,7 +352,7 @@ export default function SyncScreen() {
                 placeholderTextColor={colors.outline}
                 keyboardType="numeric"
                 style={[
-                  styles.input,
+                  tw`h-11 rounded-xl border px-3 text-sm`,
                   {
                     backgroundColor: colors.surfaceContainerHighest,
                     borderColor: colors.outlineVariant,
@@ -345,9 +364,12 @@ export default function SyncScreen() {
               />
             </View>
 
-            <View style={{ flex: 1.5 }}>
+            <View style={tw`flex-1`}>
               <Text
-                style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}
+                style={[
+                  tw`text-xs font-semibold mb-1.5`,
+                  { color: colors.onSurfaceVariant },
+                ]}
               >
                 Port
               </Text>
@@ -358,7 +380,7 @@ export default function SyncScreen() {
                 placeholderTextColor={colors.outline}
                 keyboardType="numeric"
                 style={[
-                  styles.input,
+                  tw`h-11 rounded-xl border px-3 text-sm`,
                   {
                     backgroundColor: colors.surfaceContainerHighest,
                     borderColor: colors.outlineVariant,
@@ -371,14 +393,14 @@ export default function SyncScreen() {
             </View>
           </View>
 
-          <View style={styles.buttonRow}>
+          <View style={tw`flex-row`}>
             <M3Button
               label={status === "testing" ? "Testing..." : "Test Connection"}
               icon="wifi-find"
               variant="outlined"
               loading={status === "testing"}
               onPress={handleApplyAndTest}
-              style={{ flex: 1, marginRight: Spacing.two }}
+              style={tw`flex-1 mr-2`}
             />
             <M3Button
               label={status === "downloading" ? "Syncing..." : "Sync DB"}
@@ -386,17 +408,19 @@ export default function SyncScreen() {
               variant="filled"
               loading={status === "downloading" || status === "migrating"}
               onPress={handleSyncPress}
-              style={{ flex: 1 }}
+              style={tw`flex-1`}
             />
           </View>
         </M3Card>
       )}
 
       {/* Appearance & Color Scheme Card */}
-      <M3Card variant="elevated" style={styles.prefCard}>
-        <View style={styles.cardHeader}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-3`}>
           <MaterialIcons name="palette" size={20} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+          <Text
+            style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}
+          >
             Theme & Appearance
           </Text>
         </View>
@@ -404,7 +428,7 @@ export default function SyncScreen() {
         {/* Theme Mode Switcher */}
         <View
           style={[
-            styles.themeModeRow,
+            tw`flex-row rounded-xl border p-1 mb-3`,
             {
               backgroundColor: colors.surfaceContainerLow,
               borderColor: colors.outlineVariant,
@@ -425,7 +449,7 @@ export default function SyncScreen() {
                 onPress={() => setThemeMode(item.mode)}
                 hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                 style={({ pressed }) => [
-                  styles.themeModeBtn,
+                  tw`flex-1 flex-row items-center justify-center py-2 rounded-lg`,
                   {
                     backgroundColor: isSelected
                       ? colors.secondaryContainer
@@ -442,11 +466,11 @@ export default function SyncScreen() {
                       ? colors.onSecondaryContainer
                       : colors.onSurfaceVariant
                   }
-                  style={{ marginRight: 6 }}
+                  style={tw`mr-1.5`}
                 />
                 <Text
                   style={[
-                    styles.themeModeText,
+                    tw`text-xs`,
                     {
                       color: isSelected
                         ? colors.onSecondaryContainer
@@ -463,7 +487,7 @@ export default function SyncScreen() {
         </View>
 
         {/* Accent Color Presets */}
-        <View style={styles.presetGrid}>
+        <View style={tw`flex-row flex-wrap gap-2`}>
           {THEME_ACCENT_PRESETS.map((preset) => {
             const isSelected = themeAccent === preset.id;
             return (
@@ -472,7 +496,7 @@ export default function SyncScreen() {
                 onPress={() => setThemeAccent(preset.id)}
                 hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                 style={({ pressed }) => [
-                  styles.presetChip,
+                  tw`flex-row items-center py-1.5 px-2.5 rounded-full border`,
                   {
                     backgroundColor: isSelected
                       ? colors.secondaryContainer
@@ -486,7 +510,7 @@ export default function SyncScreen() {
               >
                 <View
                   style={[
-                    styles.colorDot,
+                    tw`w-3.5 h-3.5 rounded-full mr-1.5 items-center justify-center`,
                     {
                       backgroundColor:
                         preset.id === "system" ? colors.primary : preset.color,
@@ -496,14 +520,14 @@ export default function SyncScreen() {
                   {preset.id === "system" && (
                     <MaterialIcons
                       name="wallpaper"
-                      size={10}
+                      size={9}
                       color={colors.onPrimary}
                     />
                   )}
                 </View>
                 <Text
                   style={[
-                    styles.presetLabel,
+                    tw`text-xs`,
                     {
                       color: isSelected
                         ? colors.onSecondaryContainer
@@ -521,25 +545,24 @@ export default function SyncScreen() {
       </M3Card>
 
       {/* Play as Shorts / Reels Card */}
-      <M3Card variant="elevated" style={styles.prefCard}>
-        <View style={styles.switchRow}>
-          <View style={{ flex: 1, marginRight: Spacing.two }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center justify-between`}>
+          <View style={tw`flex-1 mr-3`}>
+            <View style={tw`flex-row items-center`}>
               <MaterialIcons
                 name="movie-filter"
                 size={20}
                 color={colors.primary}
-                style={{ marginRight: Spacing.one }}
+                style={tw`mr-1.5`}
               />
-              <Text style={[styles.switchTitle, { color: colors.onSurface }]}>
+              <Text
+                style={[tw`text-sm font-bold`, { color: colors.onSurface }]}
+              >
                 Play as Shorts / Reels
               </Text>
             </View>
             <Text
-              style={[
-                styles.prefDesc,
-                { color: colors.onSurfaceVariant, marginTop: 4 },
-              ]}
+              style={[tw`text-xs mt-1`, { color: colors.onSurfaceVariant }]}
             >
               Full-screen vertical reels player with swipe-to-next.
             </Text>
@@ -557,10 +580,12 @@ export default function SyncScreen() {
       </M3Card>
 
       {/* Download Storage Location Card */}
-      <M3Card variant="elevated" style={styles.prefCard}>
-        <View style={styles.cardHeader}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-3`}>
           <MaterialIcons name="folder" size={20} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+          <Text
+            style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}
+          >
             Download Directory
           </Text>
         </View>
@@ -571,25 +596,24 @@ export default function SyncScreen() {
           placeholder="d-stream-downloads"
           placeholderTextColor={colors.outline}
           style={[
-            styles.input,
+            tw`h-11 rounded-xl border px-3 text-sm mb-3`,
             {
               backgroundColor: colors.surfaceContainerHighest,
               borderColor: colors.outlineVariant,
               color: colors.onSurface,
-              marginBottom: Spacing.two,
             },
           ]}
           autoCapitalize="none"
           autoCorrect={false}
         />
 
-        <View style={styles.buttonRow}>
+        <View style={tw`flex-row`}>
           <M3Button
             label="Save"
             icon="check"
             variant="filled"
             onPress={handleSaveDownloadLocation}
-            style={{ flex: 1, marginRight: Spacing.two }}
+            style={tw`flex-1 mr-2`}
           />
           <M3Button
             label="Reset Default"
@@ -601,15 +625,17 @@ export default function SyncScreen() {
       </M3Card>
 
       {/* Gallery Page Size Card */}
-      <M3Card variant="elevated" style={styles.prefCard}>
-        <View style={styles.cardHeader}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-3`}>
           <MaterialIcons name="view-module" size={20} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+          <Text
+            style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}
+          >
             Items per Page
           </Text>
         </View>
 
-        <View style={styles.pageSizeRow}>
+        <View style={tw`flex-row gap-2`}>
           {PAGE_SIZE_OPTIONS.map((size) => {
             const isSelected = (pageSize || 96) === size;
             return (
@@ -618,7 +644,7 @@ export default function SyncScreen() {
                 onPress={() => handleSelectPageSize(size)}
                 hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
                 style={({ pressed }) => [
-                  styles.prefSizePill,
+                  tw`flex-1 items-center justify-center py-2.5 rounded-xl border`,
                   {
                     backgroundColor: isSelected
                       ? colors.secondaryContainer
@@ -632,7 +658,7 @@ export default function SyncScreen() {
               >
                 <Text
                   style={[
-                    styles.prefSizeText,
+                    tw`text-sm`,
                     {
                       color: isSelected
                         ? colors.onSecondaryContainer
@@ -650,59 +676,81 @@ export default function SyncScreen() {
       </M3Card>
 
       {/* Local SQLite Database Snapshot Card */}
-      <M3Card variant="elevated" style={styles.dbInfoCard}>
-        <View style={styles.cardHeader}>
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-3`}>
           <MaterialIcons name="storage" size={20} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+          <Text
+            style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}
+          >
             Local Database
           </Text>
           {lastSyncTime && (
-            <Text style={[styles.lastSyncHint, { color: colors.outline }]}>
+            <Text style={[tw`ml-auto text-xs`, { color: colors.outline }]}>
               {formatRelativeTime(lastSyncTime)}
             </Text>
           )}
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatVal, { color: colors.primary }]}>
+        <View style={tw`flex-row justify-between items-center pt-1`}>
+          <View style={tw`items-center flex-1`}>
+            <Text
+              style={[tw`text-base font-extrabold`, { color: colors.primary }]}
+            >
               {stats.total_items.toLocaleString()}
             </Text>
             <Text
-              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-[11px] font-semibold mt-0.5`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Items
             </Text>
           </View>
 
-          <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatVal, { color: colors.primary }]}>
+          <View style={tw`items-center flex-1`}>
+            <Text
+              style={[tw`text-base font-extrabold`, { color: colors.primary }]}
+            >
               {stats.albums.toLocaleString()}
             </Text>
             <Text
-              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-[11px] font-semibold mt-0.5`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Albums
             </Text>
           </View>
 
-          <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatVal, { color: colors.primary }]}>
+          <View style={tw`items-center flex-1`}>
+            <Text
+              style={[tw`text-base font-extrabold`, { color: colors.primary }]}
+            >
               {stats.tags.toLocaleString()}
             </Text>
             <Text
-              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-[11px] font-semibold mt-0.5`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Tags
             </Text>
           </View>
 
-          <View style={styles.dbStatCol}>
-            <Text style={[styles.dbStatVal, { color: colors.primary }]}>
+          <View style={tw`items-center flex-1`}>
+            <Text
+              style={[tw`text-base font-extrabold`, { color: colors.primary }]}
+            >
               {stats.db_size_formatted || "0 B"}
             </Text>
             <Text
-              style={[styles.dbStatLabel, { color: colors.onSurfaceVariant }]}
+              style={[
+                tw`text-[11px] font-semibold mt-0.5`,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Size
             </Text>
@@ -714,206 +762,10 @@ export default function SyncScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   contentContainer: {
     padding: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: "center",
     width: "100%",
-  },
-  errorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.three,
-    borderRadius: Shapes.medium,
-    marginBottom: Spacing.three,
-  },
-  errorText: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: Spacing.two,
-    flex: 1,
-  },
-  historySection: {
-    marginBottom: Spacing.three,
-  },
-  sectionHeader: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    marginBottom: Spacing.two,
-  },
-  historyCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Spacing.two + 2,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-    marginBottom: Spacing.one + 2,
-  },
-  historyIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: Spacing.two,
-  },
-  historyInfo: {
-    flex: 1,
-  },
-  historyTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  historyAddress: {
-    fontSize: 14,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  historyMeta: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  deleteBtn: {
-    padding: Spacing.one,
-    marginLeft: Spacing.one,
-  },
-  configCard: {
-    marginBottom: Spacing.three,
-    padding: Spacing.three + 2,
-  },
-  prefCard: {
-    marginBottom: Spacing.three,
-    padding: Spacing.three + 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.two,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginLeft: Spacing.two,
-  },
-  lastSyncHint: {
-    marginLeft: "auto",
-    fontSize: 12,
-  },
-  formRow: {
-    flexDirection: "row",
-    marginBottom: Spacing.three,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  input: {
-    height: 46,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.two + 2,
-    fontSize: 14,
-  },
-  buttonRow: {
-    flexDirection: "row",
-  },
-  themeModeRow: {
-    flexDirection: "row",
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-    padding: 3,
-    marginBottom: Spacing.two,
-  },
-  themeModeBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 8,
-    borderRadius: Shapes.small,
-  },
-  themeModeText: {
-    fontSize: 13,
-  },
-  presetGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.one + 2,
-  },
-  presetChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: Shapes.full,
-    borderWidth: 1,
-  },
-  colorDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    marginRight: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  presetLabel: {
-    fontSize: 12,
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  prefDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  pageSizeRow: {
-    flexDirection: "row",
-    gap: Spacing.two,
-  },
-  prefSizePill: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: Shapes.medium,
-    borderWidth: 1,
-  },
-  prefSizeText: {
-    fontSize: 14,
-  },
-  dbInfoCard: {
-    marginBottom: Spacing.three,
-    padding: Spacing.three + 2,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: Spacing.one,
-  },
-  dbStatCol: {
-    alignItems: "center",
-    flex: 1,
-  },
-  dbStatVal: {
-    fontSize: 16,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-  },
-  dbStatLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    marginTop: 2,
   },
 });
