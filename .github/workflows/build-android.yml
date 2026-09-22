@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Android Release APK
@@ -19,6 +22,8 @@ jobs:
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: ⚡ Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -128,3 +133,29 @@ jobs:
           path: build-output/d-stream-release.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: 📝 Generate Structured Release Notes
+        run: bun .github/scripts/generate-release-notes.js
+
+      - name: 🏷️ Determine Release Tag & Version
+        id: release_meta
+        run: |
+          VERSION=$(bun -e "console.log(require('./package.json').version)")
+          TAG_NAME="v${VERSION}-b${{ github.run_number }}"
+          RELEASE_TITLE="d-stream v${VERSION} (Build #${{ github.run_number }})"
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "release_title=${RELEASE_TITLE}" >> $GITHUB_OUTPUT
+
+      - name: 🎉 Publish GitHub Release Package
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          name: ${{ steps.release_meta.outputs.release_title }}
+          body_path: build-output/RELEASE_NOTES.md
+          files: |
+            build-output/d-stream-release.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
