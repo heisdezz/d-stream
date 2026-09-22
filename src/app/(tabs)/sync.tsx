@@ -11,10 +11,17 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSetAtom } from "jotai";
 import { pageSizeAtom } from "@/store/atoms";
-import { useMaterialTheme } from "@/hooks/use-material-theme";
+import {
+  useMaterialTheme,
+  THEME_ACCENT_PRESETS,
+} from "@/hooks/use-material-theme";
 import { useAppStore } from "@/store/use-app-store";
 import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
-import { PAGE_SIZE_OPTIONS, DEFAULT_DOWNLOAD_LOCATION } from "@/services/storage";
+import {
+  PAGE_SIZE_OPTIONS,
+  DEFAULT_DOWNLOAD_LOCATION,
+  ThemeMode,
+} from "@/services/storage";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Badge } from "@/components/material/m3-badge";
@@ -39,7 +46,15 @@ function formatRelativeTime(iso?: string): string {
 }
 
 export default function SyncScreen() {
-  const { colors } = useMaterialTheme();
+  const {
+    colors,
+    themeAccent,
+    themeMode,
+    isDark,
+    isDynamicSupported,
+    setThemeAccent,
+    setThemeMode,
+  } = useMaterialTheme();
   const insets = useSafeAreaInsets();
   const setPageSizeAtom = useSetAtom(pageSizeAtom);
 
@@ -68,7 +83,8 @@ export default function SyncScreen() {
 
   const [inputIp, setInputIp] = useState<string>(ip);
   const [inputPort, setInputPort] = useState<string>(port.toString());
-  const [inputDlLocation, setInputDlLocation] = useState<string>(downloadLocation);
+  const [inputDlLocation, setInputDlLocation] =
+    useState<string>(downloadLocation);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   useEffect(() => {
@@ -111,7 +127,10 @@ export default function SyncScreen() {
   const handleResetDownloadLocation = async () => {
     setInputDlLocation(DEFAULT_DOWNLOAD_LOCATION);
     await updateDownloadLocation(DEFAULT_DOWNLOAD_LOCATION);
-    Alert.alert("Reset to Default", `Download location reset to: ${DEFAULT_DOWNLOAD_LOCATION}`);
+    Alert.alert(
+      "Reset to Default",
+      `Download location reset to: ${DEFAULT_DOWNLOAD_LOCATION}`,
+    );
   };
 
   const handleSelectHistoryServer = async (
@@ -397,6 +416,230 @@ export default function SyncScreen() {
         </View>
       </M3Card>
 
+      {/* Dynamic Material Theme & Color Customizer Card */}
+      <M3Card variant="elevated" style={styles.configCard}>
+        <View style={styles.cardHeader}>
+          <MaterialIcons name="palette" size={22} color={colors.primary} />
+          <Text style={[styles.cardTitle, { color: colors.onSurface }]}>
+            Dynamic Material 3 Color
+          </Text>
+          <M3Badge
+            label={
+              themeAccent === "system"
+                ? isDynamicSupported
+                  ? "EXPO UI MATERIAL YOU"
+                  : "EXPO UI DYNAMIC"
+                : "CUSTOM SEED"
+            }
+            variant="primary"
+            size="small"
+            style={{ marginLeft: "auto" }}
+          />
+        </View>
+
+        <Text
+          style={[
+            styles.prefDesc,
+            { color: colors.onSurfaceVariant, marginBottom: Spacing.three },
+          ]}
+        >
+          Powered by Expo UI dynamic Material 3 engine. Experience authentic
+          tonal elevations, wallpaper palette extraction on Android 12+, and
+          tonal palette generation.
+        </Text>
+
+        {/* Theme Mode Selector (System / Light / Dark) */}
+        <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
+          Appearance Mode
+        </Text>
+        <View
+          style={[
+            styles.themeModeRow,
+            {
+              backgroundColor: colors.surfaceContainerHighest,
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+        >
+          {(
+            [
+              { mode: "system", label: "Auto", icon: "settings-brightness" },
+              { mode: "light", label: "Light", icon: "light-mode" },
+              { mode: "dark", label: "Dark", icon: "dark-mode" },
+            ] as { mode: ThemeMode; label: string; icon: any }[]
+          ).map((item) => {
+            const isSelected = themeMode === item.mode;
+            return (
+              <Pressable
+                key={item.mode}
+                onPress={() => setThemeMode(item.mode)}
+                style={({ pressed }) => [
+                  styles.themeModeBtn,
+                  isSelected && {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.outlineVariant,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <MaterialIcons
+                  name={item.icon}
+                  size={16}
+                  color={isSelected ? colors.primary : colors.onSurfaceVariant}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.themeModeText,
+                    {
+                      color: isSelected
+                        ? colors.primary
+                        : colors.onSurfaceVariant,
+                      fontWeight: isSelected ? "800" : "600",
+                    },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Accent Color Palette Selector */}
+        <Text
+          style={[
+            styles.inputLabel,
+            { color: colors.onSurfaceVariant, marginTop: Spacing.three },
+          ]}
+        >
+          Color Theme & Accents
+        </Text>
+        <View style={styles.presetGrid}>
+          {THEME_ACCENT_PRESETS.map((preset) => {
+            const isSelected = themeAccent === preset.id;
+            return (
+              <Pressable
+                key={preset.id}
+                onPress={() => setThemeAccent(preset.id)}
+                style={({ pressed }) => [
+                  styles.presetChip,
+                  {
+                    backgroundColor: isSelected
+                      ? colors.primaryContainer
+                      : colors.surfaceContainerLow,
+                    borderColor: isSelected
+                      ? colors.primary
+                      : colors.outlineVariant,
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.colorDot,
+                    {
+                      backgroundColor: preset.isSystem
+                        ? colors.primary
+                        : preset.color,
+                    },
+                  ]}
+                >
+                  {isSelected && (
+                    <MaterialIcons name="check" size={14} color="#FFF" />
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.presetLabel,
+                    {
+                      color: isSelected
+                        ? colors.onPrimaryContainer
+                        : colors.onSurface,
+                      fontWeight: isSelected ? "800" : "600",
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {preset.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Live M3 Tonal Preview Swatch */}
+        <View
+          style={[
+            styles.tonalPreviewBox,
+            {
+              backgroundColor: colors.surfaceContainerLow,
+              borderColor: colors.outlineVariant,
+            },
+          ]}
+        >
+          <Text
+            style={[styles.previewTitle, { color: colors.onSurfaceVariant }]}
+          >
+            ACTIVE TONAL SCHEME PREVIEW ({isDark ? "DARK" : "LIGHT"})
+          </Text>
+          <View style={styles.swatchRow}>
+            <View
+              style={[styles.swatchItem, { backgroundColor: colors.primary }]}
+            >
+              <Text style={[styles.swatchText, { color: colors.onPrimary }]}>
+                Primary
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.swatchItem,
+                { backgroundColor: colors.primaryContainer },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.swatchText,
+                  { color: colors.onPrimaryContainer },
+                ]}
+              >
+                Container
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.swatchItem,
+                { backgroundColor: colors.secondaryContainer },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.swatchText,
+                  { color: colors.onSecondaryContainer },
+                ]}
+              >
+                Secondary
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.swatchItem,
+                { backgroundColor: colors.tertiaryContainer },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.swatchText,
+                  { color: colors.onTertiaryContainer },
+                ]}
+              >
+                Tertiary
+              </Text>
+            </View>
+          </View>
+        </View>
+      </M3Card>
+
       {/* Media Download & Offline Location Card */}
       <M3Card variant="elevated" style={styles.configCard}>
         <View style={styles.cardHeader}>
@@ -412,8 +655,15 @@ export default function SyncScreen() {
           />
         </View>
 
-        <Text style={[styles.prefDesc, { color: colors.onSurfaceVariant, marginBottom: Spacing.two }]}>
-          Specify folder path for offline video and photo downloads. Downloaded items are automatically stored inside album subfolders (e.g. <Text style={{ fontWeight: '800' }}>Movies/d-stream/&lt;AlbumName&gt;/</Text>) for offline playback.
+        <Text
+          style={[
+            styles.prefDesc,
+            { color: colors.onSurfaceVariant, marginBottom: Spacing.two },
+          ]}
+        >
+          Specify folder path for offline video and photo downloads. Downloaded
+          items are automatically stored inside album subfolders (e.g.
+          Movies/d-stream/&lt;AlbumName&gt;/) for offline playback.
         </Text>
 
         <Text style={[styles.inputLabel, { color: colors.onSurfaceVariant }]}>
@@ -472,7 +722,8 @@ export default function SyncScreen() {
         </View>
 
         <Text style={[styles.prefDesc, { color: colors.onSurfaceVariant }]}>
-          Choose how many media items are loaded per page in Media Explorer and Album galleries. Multiples of 24 (min: 24, max: 180).
+          Choose how many media items are loaded per page in Media Explorer and
+          Album galleries. Multiples of 24 (min: 24, max: 180).
         </Text>
 
         <ScrollView
@@ -504,9 +755,7 @@ export default function SyncScreen() {
                   style={[
                     styles.prefSizeText,
                     {
-                      color: isSelected
-                        ? colors.onPrimary
-                        : colors.onSurface,
+                      color: isSelected ? colors.onPrimary : colors.onSurface,
                       fontWeight: isSelected ? "900" : "600",
                     },
                   ]}
@@ -518,9 +767,7 @@ export default function SyncScreen() {
                     style={[
                       styles.defaultTag,
                       {
-                        color: isSelected
-                          ? colors.onPrimary
-                          : colors.outline,
+                        color: isSelected ? colors.onPrimary : colors.outline,
                       },
                     ]}
                   >
@@ -719,6 +966,75 @@ const styles = StyleSheet.create({
   prefDesc: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  themeModeRow: {
+    flexDirection: "row",
+    borderRadius: Shapes.medium,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: Spacing.two,
+  },
+  themeModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: Shapes.small,
+  },
+  themeModeText: {
+    fontSize: 13,
+  },
+  presetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: Spacing.three,
+  },
+  presetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Shapes.large,
+    borderWidth: 1,
+  },
+  colorDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  presetLabel: {
+    fontSize: 12,
+  },
+  tonalPreviewBox: {
+    padding: Spacing.two + 2,
+    borderRadius: Shapes.medium,
+    borderWidth: 1,
+  },
+  previewTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    marginBottom: Spacing.one,
+  },
+  swatchRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  swatchItem: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: Shapes.small,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swatchText: {
+    fontSize: 10,
+    fontWeight: "700",
   },
   pageSizePillsContainer: {
     flexDirection: "row",

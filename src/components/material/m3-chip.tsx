@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Pressable,
   Text,
@@ -6,10 +6,10 @@ import {
   View,
   ViewStyle,
   Platform,
-} from 'react-native';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { Shapes, Spacing } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons';
+} from "react-native";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { Shapes, Spacing } from "@/constants/theme";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export interface M3ChipProps {
   label: string;
@@ -33,7 +33,9 @@ export const M3Chip: React.FC<M3ChipProps> = ({
   const { colors } = useMaterialTheme();
 
   const containerBg = selected
-    ? colorHex ? colorHex + '25' : colors.secondaryContainer
+    ? colorHex
+      ? colorHex + "25"
+      : colors.secondaryContainer
     : colors.surfaceContainerLow;
 
   const textColor = selected
@@ -47,17 +49,19 @@ export const M3Chip: React.FC<M3ChipProps> = ({
   return (
     <Pressable
       onPress={onPress}
+      // Meet 48dp touch target craft floor
+      hitSlop={{ top: 7, bottom: 7, left: 4, right: 4 }}
       style={({ pressed }) => [
         styles.chip,
         {
           backgroundColor: containerBg,
           borderColor,
         },
-        pressed && { opacity: Platform.OS === 'ios' ? 0.7 : 0.9 },
+        pressed && { opacity: Platform.OS === "ios" ? 0.7 : 0.88 },
         style,
       ]}
       android_ripple={{
-        color: (colorHex || colors.primary) + '20',
+        color: (colorHex || colors.primary) + "20",
         borderless: false,
       }}
     >
@@ -70,12 +74,7 @@ export const M3Chip: React.FC<M3ChipProps> = ({
         />
       )}
       {colorHex && !icon && (
-        <View
-          style={[
-            styles.dot,
-            { backgroundColor: colorHex },
-          ]}
-        />
+        <View style={[styles.dot, { backgroundColor: colorHex }]} />
       )}
       <Text style={[styles.label, { color: textColor }]}>{label}</Text>
       {count !== undefined && (
@@ -93,9 +92,7 @@ export const M3Chip: React.FC<M3ChipProps> = ({
             style={[
               styles.badgeText,
               {
-                color: selected
-                  ? colors.onSecondary
-                  : colors.onSurfaceVariant,
+                color: selected ? colors.onSecondary : colors.onSurfaceVariant,
               },
             ]}
           >
@@ -109,9 +106,9 @@ export const M3Chip: React.FC<M3ChipProps> = ({
 
 const styles = StyleSheet.create({
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    height: 36,
     paddingHorizontal: 12,
     borderRadius: Shapes.small,
     borderWidth: 1,
@@ -125,7 +122,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "600",
   },
   badge: {
     paddingHorizontal: 6,
@@ -135,6 +132,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

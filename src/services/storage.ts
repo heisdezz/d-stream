@@ -10,6 +10,8 @@ export const MAX_PAGE_SIZE = 180;
 export const PAGE_SIZE_OPTIONS = [24, 48, 72, 96, 120, 144, 168, 180];
 export const DEFAULT_DOWNLOAD_LOCATION = "Movies/d-stream";
 
+export type ThemeMode = "system" | "light" | "dark";
+
 export interface DownloadedItemRecord {
   mediaId: number;
   localUri: string;
@@ -30,6 +32,8 @@ interface AppStorageData {
   pageSize: number;
   downloadLocation: string;
   downloadedItems: Record<number, DownloadedItemRecord>;
+  themeAccent: string;
+  themeMode: ThemeMode;
 }
 
 const defaultData: AppStorageData = {
@@ -41,6 +45,8 @@ const defaultData: AppStorageData = {
   pageSize: DEFAULT_PAGE_SIZE,
   downloadLocation: DEFAULT_DOWNLOAD_LOCATION,
   downloadedItems: {},
+  themeAccent: "system",
+  themeMode: "system",
 };
 
 let memoryCache: AppStorageData = { ...defaultData };
@@ -148,7 +154,7 @@ export async function getViewMode(): Promise<"grid" | "list"> {
   return data.viewMode;
 }
 
-export async function setViewMode(mode: "grid" | "list"): Promise<void> {
+export async function saveViewMode(mode: "grid" | "list"): Promise<void> {
   const data = await loadDataFromDisk();
   data.viewMode = mode;
   await saveDataToDisk();
@@ -209,4 +215,27 @@ export async function removeDownloadedItemRecord(
     return { ...nextMap };
   }
   return { ...(data.downloadedItems || {}) };
+}
+
+export async function getSavedThemeConfig(): Promise<{
+  accent: string;
+  mode: ThemeMode;
+}> {
+  const data = await loadDataFromDisk();
+  return {
+    accent: data.themeAccent || "system",
+    mode: data.themeMode || "system",
+  };
+}
+
+export async function saveThemeConfig(
+  accent: string,
+  mode: ThemeMode,
+): Promise<void> {
+  const data = await loadDataFromDisk();
+  data.themeAccent = accent;
+  data.themeMode = mode;
+  memoryCache.themeAccent = accent;
+  memoryCache.themeMode = mode;
+  await saveDataToDisk();
 }

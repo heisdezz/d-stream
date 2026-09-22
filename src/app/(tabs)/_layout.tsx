@@ -10,8 +10,9 @@ export default function TabLayout() {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
 
-  const bottomInset = insets.bottom > 0 ? insets.bottom : 6;
-  const tabHeight = 58 + bottomInset;
+  const bottomInset = insets.bottom > 0 ? insets.bottom : 8;
+  // Material 3 specification for bottom navigation bar height: 80dp + insets
+  const tabHeight = 68 + bottomInset;
 
   return (
     <Tabs
@@ -29,18 +30,18 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.surfaceContainer,
           borderTopColor: colors.outlineVariant,
-          borderTopWidth: 1,
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: tabHeight,
           paddingBottom: bottomInset,
-          paddingTop: 6,
-          elevation: 8,
+          paddingTop: 8,
+          elevation: 3,
         },
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.onSurface,
         tabBarInactiveTintColor: colors.onSurfaceVariant,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "700",
-          marginTop: 2,
+          marginTop: 4,
         },
       }}
     >
@@ -52,7 +53,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.iconBox,
+                styles.activeIndicatorPill,
                 focused && { backgroundColor: colors.secondaryContainer },
               ]}
             >
@@ -75,7 +76,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.iconBox,
+                styles.activeIndicatorPill,
                 focused && { backgroundColor: colors.secondaryContainer },
               ]}
             >
@@ -98,7 +99,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.iconBox,
+                styles.activeIndicatorPill,
                 focused && { backgroundColor: colors.secondaryContainer },
               ]}
             >
@@ -121,7 +122,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.iconBox,
+                styles.activeIndicatorPill,
                 focused && { backgroundColor: colors.secondaryContainer },
               ]}
             >
@@ -142,11 +143,11 @@ export default function TabLayout() {
         name="sync"
         options={{
           title: "Sync",
-          headerTitle: "LAN Sync & DB",
+          headerTitle: "LAN Sync & Settings",
           tabBarIcon: ({ color, focused }) => (
             <View
               style={[
-                styles.iconBox,
+                styles.activeIndicatorPill,
                 focused && { backgroundColor: colors.secondaryContainer },
               ]}
             >
@@ -165,9 +166,10 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  iconBox: {
-    width: 46,
-    height: 28,
+  // Material 3 compact active indicator pill: standard 64x32dp
+  activeIndicatorPill: {
+    width: 60,
+    height: 32,
     borderRadius: Shapes.full,
     alignItems: "center",
     justifyContent: "center",

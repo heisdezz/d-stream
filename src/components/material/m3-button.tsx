@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Pressable,
   Text,
@@ -8,52 +8,58 @@ import {
   ActivityIndicator,
   Platform,
   View,
-} from 'react-native';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { Elevation, Shapes, Spacing } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons';
+} from "react-native";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { Elevation, Shapes, Spacing } from "@/constants/theme";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export interface M3ButtonProps {
   label: string;
   onPress: () => void;
-  variant?: 'filled' | 'tonal' | 'outlined' | 'text' | 'fab';
+  variant?: "filled" | "tonal" | "outlined" | "text" | "fab";
   icon?: keyof typeof MaterialIcons.glyphMap;
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
   labelStyle?: TextStyle;
-  size?: 'small' | 'medium' | 'large';
+  size?: "small" | "medium" | "large";
 }
 
 export const M3Button: React.FC<M3ButtonProps> = ({
   label,
   onPress,
-  variant = 'filled',
+  variant = "filled",
   icon,
   loading = false,
   disabled = false,
   style,
   labelStyle,
-  size = 'medium',
+  size = "medium",
 }) => {
   const { colors } = useMaterialTheme();
 
-  const getVariantStyles = (): { container: ViewStyle; text: TextStyle; iconColor: string } => {
+  const getVariantStyles = (): {
+    container: ViewStyle;
+    text: TextStyle;
+    iconColor: string;
+  } => {
     switch (variant) {
-      case 'tonal':
+      case "tonal":
         return {
           container: {
-            backgroundColor: disabled ? colors.surfaceContainerHighest : colors.secondaryContainer,
+            backgroundColor: disabled
+              ? colors.surfaceContainerHighest
+              : colors.secondaryContainer,
           },
           text: {
             color: disabled ? colors.outline : colors.onSecondaryContainer,
           },
           iconColor: disabled ? colors.outline : colors.onSecondaryContainer,
         };
-      case 'outlined':
+      case "outlined":
         return {
           container: {
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             borderWidth: 1,
             borderColor: disabled ? colors.outlineVariant : colors.outline,
           },
@@ -62,17 +68,17 @@ export const M3Button: React.FC<M3ButtonProps> = ({
           },
           iconColor: disabled ? colors.outline : colors.primary,
         };
-      case 'text':
+      case "text":
         return {
           container: {
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
           },
           text: {
             color: disabled ? colors.outline : colors.primary,
           },
           iconColor: disabled ? colors.outline : colors.primary,
         };
-      case 'fab':
+      case "fab":
         return {
           container: {
             backgroundColor: colors.primaryContainer,
@@ -81,15 +87,17 @@ export const M3Button: React.FC<M3ButtonProps> = ({
           },
           text: {
             color: colors.onPrimaryContainer,
-            fontWeight: '600',
+            fontWeight: "600",
           },
           iconColor: colors.onPrimaryContainer,
         };
-      case 'filled':
+      case "filled":
       default:
         return {
           container: {
-            backgroundColor: disabled ? colors.surfaceContainerHighest : colors.primary,
+            backgroundColor: disabled
+              ? colors.surfaceContainerHighest
+              : colors.primary,
           },
           text: {
             color: disabled ? colors.outline : colors.onPrimary,
@@ -99,38 +107,71 @@ export const M3Button: React.FC<M3ButtonProps> = ({
     }
   };
 
-  const getSizeStyles = (): { height: number; paddingHorizontal: number; fontSize: number; iconSize: number } => {
+  const getSizeStyles = (): {
+    height: number;
+    paddingHorizontal: number;
+    fontSize: number;
+    iconSize: number;
+  } => {
     switch (size) {
-      case 'small':
-        return { height: 36, paddingHorizontal: 12, fontSize: 13, iconSize: 16 };
-      case 'large':
-        return { height: 48, paddingHorizontal: 24, fontSize: 16, iconSize: 22 };
-      case 'medium':
+      case "small":
+        return {
+          height: 38,
+          paddingHorizontal: 14,
+          fontSize: 13,
+          iconSize: 16,
+        };
+      case "large":
+        return {
+          height: 52,
+          paddingHorizontal: 24,
+          fontSize: 16,
+          iconSize: 22,
+        };
+      case "medium":
       default:
-        return { height: 42, paddingHorizontal: 18, fontSize: 14, iconSize: 18 };
+        return {
+          height: 44,
+          paddingHorizontal: 18,
+          fontSize: 14,
+          iconSize: 18,
+        };
     }
   };
 
   const { container: vContainer, text: vText, iconColor } = getVariantStyles();
   const sizeConfig = getSizeStyles();
 
+  // Ensure minimum 48dp touch target hitSlop according to craft-floor rules
+  const hitSlop =
+    size === "small"
+      ? { top: 6, bottom: 6, left: 4, right: 4 }
+      : size === "medium"
+        ? { top: 3, bottom: 3, left: 2, right: 2 }
+        : undefined;
+
   return (
     <Pressable
       onPress={disabled || loading ? undefined : onPress}
+      hitSlop={hitSlop}
       style={({ pressed }) => [
         styles.baseButton,
         {
           height: sizeConfig.height,
           paddingHorizontal: sizeConfig.paddingHorizontal,
-          borderRadius: variant === 'fab' ? Shapes.large : Shapes.full,
+          borderRadius: variant === "fab" ? Shapes.large : Shapes.full,
         },
         vContainer,
-        pressed && !disabled && { opacity: Platform.OS === 'ios' ? 0.75 : 0.9 },
-        disabled && { opacity: 0.6 },
+        pressed &&
+          !disabled && { opacity: Platform.OS === "ios" ? 0.75 : 0.88 },
+        disabled && { opacity: 0.5 },
         style,
       ]}
       android_ripple={{
-        color: variant === 'filled' ? colors.onPrimary + '20' : colors.primary + '20',
+        color:
+          variant === "filled"
+            ? colors.onPrimary + "20"
+            : colors.primary + "20",
         borderless: false,
       }}
     >
@@ -166,17 +207,17 @@ export const M3Button: React.FC<M3ButtonProps> = ({
 
 const styles = StyleSheet.create({
   baseButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
   },
   contentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   label: {
-    fontWeight: '600',
+    fontWeight: "700",
     letterSpacing: 0.2,
   },
 });

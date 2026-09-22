@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { Shapes, Spacing } from '@/constants/theme';
-import { MaterialIcons } from '@expo/vector-icons';
+import React from "react";
+import { View, Text, Pressable, StyleSheet, ViewStyle } from "react-native";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { Shapes, Spacing } from "@/constants/theme";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export interface SegmentItem<T extends string> {
   value: T;
@@ -46,12 +46,13 @@ export function M3SegmentedRow<T extends string>({
           <Pressable
             key={item.value}
             onPress={() => onSelect(item.value)}
+            hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
             style={({ pressed }) => [
               styles.segment,
               {
                 backgroundColor: isSelected
                   ? colors.secondaryContainer
-                  : 'transparent',
+                  : "transparent",
                 borderTopLeftRadius: isFirst ? Shapes.full : 0,
                 borderBottomLeftRadius: isFirst ? Shapes.full : 0,
                 borderTopRightRadius: isLast ? Shapes.full : 0,
@@ -65,13 +66,13 @@ export function M3SegmentedRow<T extends string>({
             {item.icon && (
               <MaterialIcons
                 name={item.icon}
-                size={16}
+                size={18}
                 color={
                   isSelected
                     ? colors.onSecondaryContainer
                     : colors.onSurfaceVariant
                 }
-                style={{ marginRight: Spacing.half }}
+                style={{ marginRight: Spacing.one }}
               />
             )}
             <Text
@@ -81,7 +82,7 @@ export function M3SegmentedRow<T extends string>({
                   color: isSelected
                     ? colors.onSecondaryContainer
                     : colors.onSurfaceVariant,
-                  fontWeight: isSelected ? '700' : '500',
+                  fontWeight: isSelected ? "700" : "500",
                 },
               ]}
               numberOfLines={1}
@@ -122,18 +123,18 @@ export function M3SegmentedRow<T extends string>({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    height: 38,
+    flexDirection: "row",
+    height: 42,
     borderRadius: Shapes.full,
     borderWidth: 1,
-    overflow: 'hidden',
-    alignItems: 'stretch',
+    overflow: "hidden",
+    alignItems: "stretch",
   },
   segment: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 8,
   },
   label: {
@@ -141,12 +142,12 @@ const styles = StyleSheet.create({
   },
   badge: {
     marginLeft: 6,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: Shapes.full,
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: "700",
   },
 });

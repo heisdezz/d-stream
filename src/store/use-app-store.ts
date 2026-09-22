@@ -28,6 +28,9 @@ import {
   saveDownloadedItemRecord,
   removeDownloadedItemRecord,
   DownloadedItemRecord,
+  ThemeMode,
+  getSavedThemeConfig,
+  saveThemeConfig,
 } from "@/services/storage";
 import {
   testServerConnection,
@@ -91,6 +94,10 @@ interface AppState {
   currentPage: number;
   pageSize: number;
 
+  // Theme State
+  themeAccent: string;
+  themeMode: ThemeMode;
+
   // Actions
   init: () => Promise<void>;
   setIp: (ip: string) => void;
@@ -110,6 +117,8 @@ interface AppState {
   ) => Promise<{ success: boolean; error?: string }>;
   removeDownloadedMediaItem: (mediaId: number) => Promise<void>;
   removeHistoryServer: (delIp: string, delPort: number) => Promise<void>;
+  setThemeAccent: (accent: string) => Promise<void>;
+  setThemeMode: (mode: ThemeMode) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -148,6 +157,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentPage: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 
+  themeAccent: "system",
+  themeMode: "system",
+
   init: async () => {
     try {
       const config = await getSavedServerConfig();
@@ -156,6 +168,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const savedPageSize = await getSavedPageSize();
       const savedDlLocation = await getSavedDownloadLocation();
       const savedDlMap = await getDownloadedItemsMap();
+      const themeConfig = await getSavedThemeConfig();
 
       set({
         ip: config.ip,
@@ -165,6 +178,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         pageSize: savedPageSize,
         downloadLocation: savedDlLocation,
         downloadedItems: { ...savedDlMap },
+        themeAccent: themeConfig.accent,
+        themeMode: themeConfig.mode,
       });
 
       await Promise.all([
@@ -241,7 +256,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       serverInfo: connTest.serverInfo,
       status: "downloading",
       errorMessage: null,
-      syncProgress: { bytesWritten: 0, contentLength: 0, percentage: 0 },
+      syncProgress: {
+        bytesWritten: 0,
+        contentLength: 0,
+        percentage: 0,
+      },
     });
 
     const { path: downloadPath, dbName } = getNewSnapshotDownloadPath();
@@ -264,7 +283,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, error: downloadRes.error };
     }
 
-    set({ status: "migrating" });
+    // Step 2: Switch to Migrating / Verification State
+    set({
+      status: "migrating",
+      syncProgress: {
+        bytesWritten: 100,
+        contentLength: 100,
+        percentage: 100,
+      },
+    });
+
     const importSuccess = await importDownloadedSnapshot(dbName);
 
     if (!importSuccess) {
@@ -277,66 +305,92 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, error: "Database import failed" };
     }
 
+    // Success! Update last sync time and refresh library in parallel
     const nowIso = new Date().toISOString();
     await setLastSyncTime(nowIso);
-
-    // Refresh local library data across all screens
-    await get().refreshLibrary();
-
-    const info = await fetchServerInfo(currentIp, currentPort);
-    if (info.drive_name) {
-      await saveServerConfig(currentIp, currentPort, info.drive_name);
-    }
+    await saveServerConfig(
+      currentIp,
+      currentPort,
+      connTest.serverInfo.drive_name,
+    );
     const updatedHistory = await getServerHistory();
 
     set({
       status: "connected",
-      syncProgress: null,
       lastSyncTime: nowIso,
-      serverInfo: info,
+      syncProgress: null,
       serverHistory: updatedHistory,
     });
 
+    await get().refreshLibrary();
     return { success: true };
   },
 
   refreshLibrary: async () => {
     set({ isRefreshing: true });
     try {
-      const [libStats, albList, tagList, recentList] = await Promise.all([
-        getLibraryStats(),
-        getAlbums(),
-        getTags(),
-        getRecentMedia(12),
-      ]);
+      const dbReady = await isDatabaseAvailable();
+      if (!dbReady) {
+        set({
+          hasDatabase: false,
+          isRefreshing: false,
+          stats: {
+            total_items: 0,
+            images: 0,
+            videos: 0,
+            albums: 0,
+            tags: 0,
+            db_size_bytes: 0,
+            db_size_formatted: "0 B",
+            db_exists: false,
+          },
+          mediaItems: [],
+          totalMediaCount: 0,
+          albums: [],
+          tags: [],
+          recentMedia: [],
+        });
+        return;
+      }
 
-      const dbAvail = libStats.total_items > 0 || (await isDatabaseAvailable());
+      const [libStats, albumsList, tagsList, recents, firstPage] =
+        await Promise.all([
+          getLibraryStats(),
+          getAlbums(),
+          getTags(),
+          getRecentMedia(8),
+          getMediaItems({ limit: get().pageSize, offset: 0 }),
+        ]);
 
       set({
+        hasDatabase: true,
         stats: libStats,
-        hasDatabase: dbAvail,
-        albums: albList,
-        tags: tagList,
-        recentMedia: recentList,
+        albums: albumsList,
+        tags: tagsList,
+        recentMedia: recents,
+        mediaItems: firstPage.items,
+        totalMediaCount: firstPage.totalCount,
+        currentPage: 1,
+        isRefreshing: false,
       });
     } catch (e) {
-      console.warn("[AppStore] Error refreshing library:", e);
-    } finally {
-      set({ isRefreshing: false, isLoading: false });
+      console.warn("[AppStore] refreshLibrary error:", e);
+      set({ isRefreshing: false });
     }
   },
 
-  fetchMediaPage: async (options: FetchPageOptions = {}) => {
-    const {
-      query = "",
-      type = "all",
-      albumId,
-      tagId,
-      sortBy = "created_at",
-      sortOrder = "DESC",
-      page = 1,
-      pageSize = get().pageSize,
-    } = options;
+  fetchMediaPage: async (options?: FetchPageOptions) => {
+    const dbReady = await isDatabaseAvailable();
+    if (!dbReady) return;
+
+    const query = options?.query;
+    const type = options?.type;
+    const albumId = options?.albumId;
+    const tagId = options?.tagId;
+    const sortBy = options?.sortBy || "created_at";
+    const sortOrder = options?.sortOrder || "DESC";
+    const page = options?.page || get().currentPage || 1;
+    const pageSize = options?.pageSize || get().pageSize || DEFAULT_PAGE_SIZE;
 
     set({ isLoading: true });
     try {
@@ -440,5 +494,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeHistoryServer: async (delIp: string, delPort: number) => {
     const updated = await removeServerFromHistory(delIp, delPort);
     set({ serverHistory: updated });
+  },
+
+  setThemeAccent: async (accent: string) => {
+    const mode = get().themeMode;
+    await saveThemeConfig(accent, mode);
+    set({ themeAccent: accent });
+  },
+
+  setThemeMode: async (mode: ThemeMode) => {
+    const accent = get().themeAccent;
+    await saveThemeConfig(accent, mode);
+    set({ themeMode: mode });
   },
 }));
