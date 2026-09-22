@@ -82,6 +82,8 @@ interface ShortsMediaCardProps {
   contextLabel: string;
   currentIndex: number;
   totalCount: number;
+  isClearMode: boolean;
+  onToggleClearMode: () => void;
 }
 
 const ShortsMediaCard = React.memo(function ShortsMediaCard({
@@ -108,8 +110,11 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
   contextLabel,
   currentIndex,
   totalCount,
+  isClearMode,
+  onToggleClearMode,
 }: ShortsMediaCardProps) {
   const insets = useSafeAreaInsets();
+  const bottomSafeArea = Math.max(insets.bottom, 16);
   const isVideo = item.mime_type.startsWith("video/");
   const lastTapRef = useRef<number>(0);
 
@@ -286,18 +291,22 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
       </Pressable>
 
       {/* Top Subtle Dark Gradient */}
-      <LinearGradient
-        colors={["rgba(0, 0, 0, 0.72)", "rgba(0, 0, 0, 0.25)", "transparent"]}
-        style={tw`absolute top-0 left-0 right-0 h-32 z-10`}
-        pointerEvents="none"
-      />
+      {!isClearMode && (
+        <LinearGradient
+          colors={["rgba(0, 0, 0, 0.72)", "rgba(0, 0, 0, 0.25)", "transparent"]}
+          style={tw`absolute top-0 left-0 right-0 h-32 z-10`}
+          pointerEvents="none"
+        />
+      )}
 
       {/* Bottom Subtle Dark Gradient */}
-      <LinearGradient
-        colors={["transparent", "rgba(0, 0, 0, 0.35)", "rgba(0, 0, 0, 0.85)"]}
-        style={tw`absolute bottom-0 left-0 right-0 h-52 z-10`}
-        pointerEvents="none"
-      />
+      {!isClearMode && (
+        <LinearGradient
+          colors={["transparent", "rgba(0, 0, 0, 0.35)", "rgba(0, 0, 0, 0.85)"]}
+          style={tw`absolute bottom-0 left-0 right-0 h-52 z-10`}
+          pointerEvents="none"
+        />
+      )}
 
       {/* Play/Pause Center Indicator */}
       {playPauseState && (
@@ -337,12 +346,13 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
       )}
 
       {/* Top Header Overlay */}
-      <View
-        style={[
-          tw`absolute top-0 left-0 right-0 flex-row items-center justify-between px-3.5 z-20`,
-          { paddingTop: insets.top + Spacing.two },
-        ]}
-      >
+      {!isClearMode && (
+        <View
+          style={[
+            tw`absolute top-0 left-0 right-0 flex-row items-center justify-between px-3.5 z-20`,
+            { paddingTop: insets.top + Spacing.two },
+          ]}
+        >
         <Pressable
           onPress={onBack}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -368,9 +378,16 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
           <MaterialIcons name="open-in-new" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
+      )}
 
       {/* Floating Right Action Rail (TikTok / Reels style) */}
-      <View style={tw`absolute right-3 bottom-12 items-center gap-3 z-20`}>
+      {!isClearMode && (
+        <View
+          style={[
+            tw`absolute right-3 items-center gap-3 z-20`,
+            { bottom: bottomSafeArea + 18 },
+          ]}
+        >
         {/* Like Button */}
         <Pressable
           onPress={() => {
@@ -475,15 +492,31 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
           </View>
           <Text style={styles.actionLabel}>Share</Text>
         </Pressable>
+
+        {/* Clear Screen Button */}
+        <Pressable
+          onPress={onToggleClearMode}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={tw`items-center`}
+        >
+          <View
+            style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
+          >
+            <MaterialIcons name="visibility-off" size={24} color="#FFFFFF" />
+          </View>
+          <Text style={styles.actionLabel}>Clear</Text>
+        </Pressable>
       </View>
+      )}
 
       {/* Floating Bottom Info Overlay */}
-      <View
-        style={[
-          tw`absolute left-0 right-20 px-4 z-20`,
-          { bottom: isVideo ? 12 : 6 },
-        ]}
-      >
+      {!isClearMode && (
+        <View
+          style={[
+            tw`absolute left-0 right-20 px-4 z-20`,
+            { bottom: isVideo ? bottomSafeArea + 22 : bottomSafeArea + 6 },
+          ]}
+        >
         {/* Album Badge */}
         {item.album_name && (
           <View
@@ -559,10 +592,16 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
           )}
         </View>
       </View>
+      )}
 
       {/* Interactive Video Seekbar */}
-      {isVideo && (
-        <View style={tw`absolute bottom-0 left-0 right-0 z-30 px-3 pb-1`}>
+      {isVideo && !isClearMode && (
+        <View
+          style={[
+            tw`absolute left-0 right-0 z-30 px-3`,
+            { bottom: bottomSafeArea },
+          ]}
+        >
           <Pressable
             onPress={(e) => {
               const touchX = e.nativeEvent.locationX;
@@ -573,12 +612,12 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
                 setCurrentTime(ratio * duration);
               }
             }}
-            hitSlop={{ top: 12, bottom: 12 }}
-            style={tw`w-full py-1 justify-center`}
+            hitSlop={{ top: 18, bottom: 18, left: 8, right: 8 }}
+            style={tw`w-full py-2 justify-center`}
           >
             {/* Background Track */}
             <View
-              style={tw`w-full h-1 bg-white/25 rounded-full overflow-hidden`}
+              style={tw`w-full h-1.5 bg-white/25 rounded-full overflow-hidden`}
             >
               {/* Progress Fill */}
               <View
@@ -590,6 +629,23 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
             </View>
           </Pressable>
         </View>
+      )}
+
+      {/* Unclear Screen Button (Visible only in Clear Mode) */}
+      {isClearMode && (
+        <Pressable
+          onPress={onToggleClearMode}
+          hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+          style={[
+            tw`absolute right-4 z-30 flex-row items-center bg-black/75 px-4 py-2.5 rounded-full border border-white/30 shadow-lg`,
+            { bottom: bottomSafeArea + 10 },
+          ]}
+        >
+          <MaterialIcons name="visibility" size={20} color="#FFFFFF" />
+          <Text style={tw`text-white font-bold text-xs ml-2`}>
+            Unclear Screen
+          </Text>
+        </Pressable>
       )}
     </View>
   );
@@ -650,8 +706,19 @@ export default function ShortsScreen() {
   const [initialIndex, setInitialIndex] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [likedMap, setLikedMap] = useState<Record<number, boolean>>({});
+  const [isClearMode, setIsClearMode] = useState<boolean>(false);
   const [selectedItemForDetails, setSelectedItemForDetails] =
     useState<MediaItem | null>(null);
+
+  const handleToggleClearMode = useCallback(() => {
+    setIsClearMode((prev) => {
+      if (!prev) {
+        setSelectedItemForDetails(null);
+        bottomSheetRef.current?.close();
+      }
+      return !prev;
+    });
+  }, []);
 
   const flatListRef = useRef<FlatList<MediaItem>>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
@@ -903,12 +970,16 @@ export default function ShortsScreen() {
           contextLabel={contextLabel}
           currentIndex={index}
           totalCount={items.length}
+          isClearMode={isClearMode}
+          onToggleClearMode={handleToggleClearMode}
         />
       );
     },
     [
       activeIndex,
       isMuted,
+      isClearMode,
+      handleToggleClearMode,
       containerDimensions.height,
       containerDimensions.width,
       ip,
