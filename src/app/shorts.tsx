@@ -842,7 +842,6 @@ export default function ShortsScreen() {
 
   const handleOpenDetails = useCallback((item: MediaItem) => {
     setSelectedItemForDetails(item);
-    bottomSheetRef.current?.snapToIndex(0);
   }, []);
 
   const renderBackdrop = useCallback(
@@ -1009,22 +1008,24 @@ export default function ShortsScreen() {
       />
 
       {/* Real Gorhom Draggable Bottom Sheet for Metadata Details */}
-      <BottomSheet
-        ref={bottomSheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: colors.surfaceContainer }}
-        handleIndicatorStyle={{
-          backgroundColor: colors.outlineVariant,
-          width: 44,
-          height: 4,
-        }}
-        onClose={() => setSelectedItemForDetails(null)}
-      >
-        <BottomSheetView style={tw`flex-1 px-5 pt-1 pb-8`}>
-          {selectedItemForDetails && (
+      {selectedItemForDetails && (
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={0}
+          snapPoints={snapPoints}
+          enableDynamicSizing={false}
+          enablePanDownToClose
+          animateOnMount
+          backdropComponent={renderBackdrop}
+          backgroundStyle={{ backgroundColor: colors.surfaceContainer }}
+          handleIndicatorStyle={{
+            backgroundColor: colors.outlineVariant,
+            width: 44,
+            height: 4,
+          }}
+          onClose={() => setSelectedItemForDetails(null)}
+        >
+          <BottomSheetView style={tw`flex-1 px-5 pt-1 pb-8`}>
             <>
               {/* Header */}
               <View style={tw`flex-row items-center mb-4`}>
@@ -1183,9 +1184,9 @@ export default function ShortsScreen() {
                 />
               </View>
             </>
-          )}
-        </BottomSheetView>
-      </BottomSheet>
+          </BottomSheetView>
+        </BottomSheet>
+      )}
     </View>
   );
 }
