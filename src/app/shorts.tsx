@@ -11,7 +11,8 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  useWindowDimensions,
+  Dimensions,
+  LayoutChangeEvent,
   Platform,
   Share,
   ActivityIndicator,
@@ -39,7 +40,7 @@ import { getMediaItems, getMediaItemById } from "@/services/local-db";
 import { getMediaStreamUrl, getThumbnailUrl } from "@/services/sync-api";
 import { MediaItem } from "@/types/models";
 import { DownloadProgress } from "@/services/downloader";
-import { Spacing, Shapes } from "@/constants/theme";
+import { Spacing } from "@/constants/theme";
 import { M3Button } from "@/components/material/m3-button";
 
 function formatFileSize(bytes: number): string {
@@ -369,12 +370,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
       </View>
 
       {/* Floating Right Action Rail (TikTok / Reels style) */}
-      <View
-        style={[
-          tw`absolute right-3 items-center gap-3 z-20`,
-          { bottom: insets.bottom + Spacing.seven + 24 },
-        ]}
-      >
+      <View style={tw`absolute right-3 bottom-12 items-center gap-3 z-20`}>
         {/* Like Button */}
         <Pressable
           onPress={() => {
@@ -484,8 +480,8 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
       {/* Floating Bottom Info Overlay */}
       <View
         style={[
-          tw`absolute bottom-0 left-0 right-20 px-4 z-20`,
-          { paddingBottom: insets.bottom + Spacing.four + (isVideo ? 14 : 0) },
+          tw`absolute left-0 right-20 px-4 z-20`,
+          { bottom: isVideo ? 12 : 6 },
         ]}
       >
         {/* Album Badge */}
@@ -566,12 +562,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
 
       {/* Interactive Video Seekbar */}
       {isVideo && (
-        <View
-          style={[
-            tw`absolute bottom-0 left-0 right-0 z-30 px-3`,
-            { paddingBottom: Math.max(insets.bottom, 6) },
-          ]}
-        >
+        <View style={tw`absolute bottom-0 left-0 right-0 z-30 px-3 pb-1`}>
           <Pressable
             onPress={(e) => {
               const touchX = e.nativeEvent.locationX;
@@ -583,7 +574,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
               }
             }}
             hitSlop={{ top: 12, bottom: 12 }}
-            style={tw`w-full py-1.5 justify-center`}
+            style={tw`w-full py-1 justify-center`}
           >
             {/* Background Track */}
             <View
@@ -607,11 +598,41 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
 export default function ShortsScreen() {
   const router = useRouter();
   const { colors } = useMaterialTheme();
-  const { width, height } = useWindowDimensions();
-  const { mediaId, albumId, mode } = useLocalSearchParams<{
+
+  // Screen measurement to ensure edge-to-edge full container sizing
+  const [containerDimensions, setContainerDimensions] = useState(() => ({
+    width: Dimensions.get("screen").width,
+    height: Dimensions.get("screen").height,
+  }));
+
+  const handleContainerLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width: w, height: h } = e.nativeEvent.layout;
+    if (h > 0 && w > 0) {
+      setContainerDimensions((prev) => {
+        if (prev.width === w && prev.height === h) return prev;
+        return { width: w, height: h };
+      });
+    }
+  }, []);
+
+  const {
+    mediaId,
+    albumId,
+    tagId,
+    mode,
+    mediaType,
+    sortBy,
+    sortOrder,
+    searchQuery,
+  } = useLocalSearchParams<{
     mediaId?: string;
     albumId?: string;
+    tagId?: string;
     mode?: string;
+    mediaType?: "all" | "image" | "video";
+    sortBy?: string;
+    sortOrder?: "ASC" | "DESC";
+    searchQuery?: string;
   }>();
 
   const {
@@ -626,6 +647,7 @@ export default function ShortsScreen() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [initialIndex, setInitialIndex] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [likedMap, setLikedMap] = useState<Record<number, boolean>>({});
   const [selectedItemForDetails, setSelectedItemForDetails] =
@@ -637,6 +659,7 @@ export default function ShortsScreen() {
 
   const targetMediaId = mediaId ? parseInt(mediaId, 10) : NaN;
   const targetAlbumId = albumId ? parseInt(albumId, 10) : NaN;
+  const targetTagId = tagId ? parseInt(tagId, 10) : NaN;
 
   // Load media items: Album gallery scoped vs General library scoped
   useEffect(() => {
@@ -646,40 +669,53 @@ export default function ShortsScreen() {
         let fetched: MediaItem[] = [];
 
         if (!isNaN(targetAlbumId)) {
-          // Scoped strictly to album
+          // Scoped strictly to album, preserving album's active type filter, query and sorting
           const res = await getMediaItems({
             albumId: targetAlbumId,
-            limit: 500,
-            sortBy: "created_at",
-            sortOrder: "DESC",
+            type: mediaType || "all",
+            query: searchQuery || "",
+            sortBy: (sortBy as any) || "created_at",
+            sortOrder: (sortOrder as any) || "DESC",
+            limit: 1000,
           });
           fetched = res.items;
         } else if (mode === "downloads") {
           // Scoped to downloaded items
-          fetched = Object.values(downloadedItems).map((dl) => ({
-            id: dl.mediaId,
-            file_hash: "",
-            original_relative_path: dl.fileName,
-            current_relative_path: dl.fileName,
-            file_size: dl.fileSize,
-            mime_type: dl.mimeType,
-            duration_seconds: null,
-            metadata_json: null,
-            album_id: null,
-            album_name: dl.albumName,
-            created_at: dl.downloadedAt,
-          }));
+          fetched = Object.values(downloadedItems)
+            .filter((dl) => {
+              if (mediaType === "video")
+                return dl.mimeType.startsWith("video/");
+              if (mediaType === "image")
+                return dl.mimeType.startsWith("image/");
+              return true;
+            })
+            .map((dl) => ({
+              id: dl.mediaId,
+              file_hash: "",
+              original_relative_path: dl.fileName,
+              current_relative_path: dl.fileName,
+              file_size: dl.fileSize,
+              mime_type: dl.mimeType,
+              duration_seconds: null,
+              metadata_json: null,
+              album_id: null,
+              album_name: dl.albumName,
+              created_at: dl.downloadedAt,
+            }));
         } else {
-          // General library playback
+          // General library playback, respecting active filter
           const res = await getMediaItems({
-            limit: 500,
-            sortBy: "created_at",
-            sortOrder: "DESC",
+            tagId: !isNaN(targetTagId) ? targetTagId : undefined,
+            type: mediaType || "all",
+            query: searchQuery || "",
+            sortBy: (sortBy as any) || "created_at",
+            sortOrder: (sortOrder as any) || "DESC",
+            limit: 1000,
           });
           fetched = res.items;
         }
 
-        // Single item fallback if not in list
+        // Ensure clicked media item is in the list
         if (
           !isNaN(targetMediaId) &&
           !fetched.some((i) => i.id === targetMediaId)
@@ -690,14 +726,14 @@ export default function ShortsScreen() {
           }
         }
 
-        setItems(fetched);
+        const foundIdx = !isNaN(targetMediaId)
+          ? fetched.findIndex((i) => i.id === targetMediaId)
+          : 0;
+        const validIdx = foundIdx >= 0 ? foundIdx : 0;
 
-        if (!isNaN(targetMediaId)) {
-          const foundIdx = fetched.findIndex((i) => i.id === targetMediaId);
-          if (foundIdx >= 0) {
-            setActiveIndex(foundIdx);
-          }
-        }
+        setItems(fetched);
+        setActiveIndex(validIdx);
+        setInitialIndex(validIdx);
       } catch (err) {
         console.warn("[Shorts] Failed to load shorts feed:", err);
       } finally {
@@ -706,7 +742,30 @@ export default function ShortsScreen() {
     }
 
     loadShortsFeed();
-  }, [targetMediaId, targetAlbumId, mode]);
+  }, [
+    targetMediaId,
+    targetAlbumId,
+    targetTagId,
+    mode,
+    mediaType,
+    sortBy,
+    sortOrder,
+    searchQuery,
+  ]);
+
+  // Ensure scroll position lands squarely on target item after layout is ready
+  useEffect(() => {
+    if (
+      items.length > 0 &&
+      initialIndex > 0 &&
+      containerDimensions.height > 0
+    ) {
+      flatListRef.current?.scrollToOffset({
+        offset: initialIndex * containerDimensions.height,
+        animated: false,
+      });
+    }
+  }, [items, initialIndex, containerDimensions.height]);
 
   // Viewability tracking
   const onViewableItemsChanged = useRef(
@@ -801,21 +860,21 @@ export default function ShortsScreen() {
 
   // Context title label
   const contextLabel = useMemo(() => {
+    const typeSuffix =
+      mediaType === "video" ? "Videos" : mediaType === "image" ? "Photos" : "";
+
     if (!isNaN(targetAlbumId)) {
       const firstWithAlbum = items.find((i) => i.album_name);
-      return firstWithAlbum?.album_name
-        ? `📁 ${firstWithAlbum.album_name}`
-        : "Album Gallery Reels";
+      const albName = firstWithAlbum?.album_name || "Album";
+      return typeSuffix ? `📁 ${albName} • ${typeSuffix}` : `📁 ${albName}`;
     }
-    if (mode === "downloads") return "💾 Offline Downloads";
-    return "🔥 Library Shorts";
-  }, [targetAlbumId, mode, items]);
-
-  const initialIndex = useMemo(() => {
-    if (isNaN(targetMediaId) || items.length === 0) return 0;
-    const idx = items.findIndex((i) => i.id === targetMediaId);
-    return idx >= 0 ? idx : 0;
-  }, [targetMediaId, items]);
+    if (mode === "downloads") {
+      return typeSuffix
+        ? `💾 Downloads • ${typeSuffix}`
+        : "💾 Offline Downloads";
+    }
+    return typeSuffix ? `🔥 Shorts • ${typeSuffix}` : "🔥 Library Shorts";
+  }, [targetAlbumId, mode, items, mediaType]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: MediaItem; index: number }) => {
@@ -826,8 +885,8 @@ export default function ShortsScreen() {
           isActive={index === activeIndex}
           isNeighbor={isNeighbor}
           isMuted={isMuted}
-          containerHeight={height}
-          containerWidth={width}
+          containerHeight={containerDimensions.height}
+          containerWidth={containerDimensions.width}
           serverIp={ip}
           serverPort={port}
           isConnected={syncStatus === "connected"}
@@ -851,8 +910,8 @@ export default function ShortsScreen() {
     [
       activeIndex,
       isMuted,
-      height,
-      width,
+      containerDimensions.height,
+      containerDimensions.width,
       ip,
       port,
       syncStatus,
@@ -910,7 +969,7 @@ export default function ShortsScreen() {
   }
 
   return (
-    <View style={tw`flex-1 bg-black`}>
+    <View style={tw`flex-1 bg-black`} onLayout={handleContainerLayout}>
       <StatusBar
         barStyle="light-content"
         translucent
@@ -925,15 +984,23 @@ export default function ShortsScreen() {
         pagingEnabled
         horizontal={false}
         showsVerticalScrollIndicator={false}
-        snapToInterval={height}
+        snapToInterval={containerDimensions.height}
         snapToAlignment="start"
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         initialScrollIndex={initialIndex > 0 ? initialIndex : 0}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToOffset({
+              offset: info.index * containerDimensions.height,
+              animated: false,
+            });
+          }, 50);
+        }}
         getItemLayout={(_, index) => ({
-          length: height,
-          offset: height * index,
+          length: containerDimensions.height,
+          offset: containerDimensions.height * index,
           index,
         })}
         windowSize={3}

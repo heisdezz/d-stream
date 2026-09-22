@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,33 +6,39 @@ import {
   useWindowDimensions,
   Pressable,
   ScrollView,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { LegendList, LegendListRef } from '@legendapp/list/react-native';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { useAppStore } from '@/store/use-app-store';
-import { getAlbumById, getMediaItems } from '@/services/local-db';
-import { getThumbnailUrl } from '@/services/sync-api';
-import { MediaTypeFilter, ViewLayoutMode } from '@/store/atoms';
-import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
-import { DebouncedSearchBar } from '@/components/common/debounced-search-bar';
-import { M3SegmentedRow, SegmentItem } from '@/components/material/m3-segmented-row';
-import { M3Badge } from '@/components/material/m3-badge';
-import { M3Button } from '@/components/material/m3-button';
-import { MediaGridItem } from '@/components/media/media-grid-item';
-import { MediaListItem } from '@/components/media/media-list-item';
-import { PaginationBar } from '@/components/media/pagination-bar';
-import { ScreenLoader, ScreenTransition } from '@/components/common/screen-loader';
-import { MediaItem } from '@/types/models';
-import { MaterialIcons } from '@expo/vector-icons';
+} from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { LegendList, LegendListRef } from "@legendapp/list/react-native";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { useAppStore } from "@/store/use-app-store";
+import { getAlbumById, getMediaItems } from "@/services/local-db";
+import { getThumbnailUrl } from "@/services/sync-api";
+import { MediaTypeFilter, ViewLayoutMode } from "@/store/atoms";
+import { Spacing, Shapes, MaxContentWidth, Elevation } from "@/constants/theme";
+import { DebouncedSearchBar } from "@/components/common/debounced-search-bar";
+import {
+  M3SegmentedRow,
+  SegmentItem,
+} from "@/components/material/m3-segmented-row";
+import { M3Badge } from "@/components/material/m3-badge";
+import { M3Button } from "@/components/material/m3-button";
+import { MediaGridItem } from "@/components/media/media-grid-item";
+import { MediaListItem } from "@/components/media/media-list-item";
+import { PaginationBar } from "@/components/media/pagination-bar";
+import {
+  ScreenLoader,
+  ScreenTransition,
+} from "@/components/common/screen-loader";
+import { MediaItem } from "@/types/models";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const typeSegments: SegmentItem<MediaTypeFilter>[] = [
-  { value: 'all', label: 'All', icon: 'perm-media' },
-  { value: 'image', label: 'Photos', icon: 'image' },
-  { value: 'video', label: 'Videos', icon: 'videocam' },
+  { value: "all", label: "All", icon: "perm-media" },
+  { value: "image", label: "Photos", icon: "image" },
+  { value: "video", label: "Videos", icon: "videocam" },
 ];
 
 export default function AlbumGalleryScreen() {
@@ -45,13 +51,22 @@ export default function AlbumGalleryScreen() {
 
   const albumId = id ? parseInt(id, 10) : NaN;
 
-  const { ip, port, status: syncStatus, pageSize: storePageSize, updatePageSize, playAsShorts } = useAppStore();
+  const {
+    ip,
+    port,
+    status: syncStatus,
+    pageSize: storePageSize,
+    updatePageSize,
+    playAsShorts,
+  } = useAppStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [type, setType] = useState<MediaTypeFilter>('all');
-  const [sortBy, setSortBy] = useState<'created_at' | 'file_size' | 'current_relative_path'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
-  const [layoutMode, setLayoutMode] = useState<ViewLayoutMode>('grid');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [type, setType] = useState<MediaTypeFilter>("all");
+  const [sortBy, setSortBy] = useState<
+    "created_at" | "file_size" | "current_relative_path"
+  >("created_at");
+  const [sortOrder, setSortOrder] = useState<"ASC" | "DESC">("DESC");
+  const [layoutMode, setLayoutMode] = useState<ViewLayoutMode>("grid");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(storePageSize || 96);
 
@@ -63,7 +78,7 @@ export default function AlbumGalleryScreen() {
 
   // 1. Fetch Album Metadata via TanStack Query
   const { data: album } = useQuery({
-    queryKey: ['album-meta', albumId],
+    queryKey: ["album-meta", albumId],
     queryFn: () => getAlbumById(albumId),
     enabled: !isNaN(albumId),
   });
@@ -75,7 +90,16 @@ export default function AlbumGalleryScreen() {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['album-media', albumId, page, pageSize, type, searchQuery, sortBy, sortOrder],
+    queryKey: [
+      "album-media",
+      albumId,
+      page,
+      pageSize,
+      type,
+      searchQuery,
+      sortBy,
+      sortOrder,
+    ],
     queryFn: () =>
       getMediaItems({
         albumId,
@@ -105,30 +129,38 @@ export default function AlbumGalleryScreen() {
   };
 
   const toggleLayoutMode = () => {
-    if (layoutMode === 'grid') setLayoutMode('grid3');
-    else if (layoutMode === 'grid3') setLayoutMode('list');
-    else setLayoutMode('grid');
+    if (layoutMode === "grid") setLayoutMode("grid3");
+    else if (layoutMode === "grid3") setLayoutMode("list");
+    else setLayoutMode("grid");
   };
 
   const coverUrl =
-    album?.cover_media_id && syncStatus === 'connected'
+    album?.cover_media_id && syncStatus === "connected"
       ? getThumbnailUrl(ip, port, album.cover_media_id)
       : null;
 
   const contentWidth = Math.min(width - Spacing.four * 2, MaxContentWidth);
-  const numColumns = layoutMode === 'list' ? 1 : layoutMode === 'grid3' ? 3 : 2;
+  const numColumns = layoutMode === "list" ? 1 : layoutMode === "grid3" ? 3 : 2;
   const gridItemWidth =
-    layoutMode === 'grid3'
+    layoutMode === "grid3"
       ? (contentWidth - Spacing.two * 2) / 3
       : (contentWidth - Spacing.two) / 2;
 
-  const estimatedSize = layoutMode === 'list' ? 88 : Math.round(gridItemWidth * 1.1);
+  const estimatedSize =
+    layoutMode === "list" ? 88 : Math.round(gridItemWidth * 1.1);
 
   const handleMediaPress = (m: MediaItem) => {
     if (playAsShorts) {
       router.push({
-        pathname: '/shorts',
-        params: { mediaId: m.id.toString(), albumId: albumId.toString() },
+        pathname: "/shorts",
+        params: {
+          mediaId: m.id.toString(),
+          albumId: albumId.toString(),
+          mediaType: type,
+          sortBy,
+          sortOrder,
+          ...(searchQuery ? { searchQuery } : {}),
+        },
       });
     } else {
       router.push(`/media/${m.id}`);
@@ -136,12 +168,12 @@ export default function AlbumGalleryScreen() {
   };
 
   const renderItem = ({ item }: { item: MediaItem }) => {
-    if (layoutMode === 'list') {
+    if (layoutMode === "list") {
       return (
         <MediaListItem
           item={item}
           onPress={handleMediaPress}
-          serverIp={syncStatus === 'connected' ? ip : undefined}
+          serverIp={syncStatus === "connected" ? ip : undefined}
           serverPort={port}
         />
       );
@@ -150,16 +182,16 @@ export default function AlbumGalleryScreen() {
       <View
         style={{
           width: gridItemWidth,
-          marginRight: layoutMode === 'grid3' ? Spacing.one + 2 : Spacing.two,
+          marginRight: layoutMode === "grid3" ? Spacing.one + 2 : Spacing.two,
         }}
       >
         <MediaGridItem
           item={item}
           onPress={handleMediaPress}
           width={gridItemWidth}
-          serverIp={syncStatus === 'connected' ? ip : undefined}
+          serverIp={syncStatus === "connected" ? ip : undefined}
           serverPort={port}
-          aspectRatio={layoutMode === 'grid3' ? 1 : 1.1}
+          aspectRatio={layoutMode === "grid3" ? 1 : 1.1}
         />
       </View>
     );
@@ -187,8 +219,17 @@ export default function AlbumGalleryScreen() {
         )}
         <View style={styles.heroOverlay}>
           <View style={styles.heroTopRow}>
-            <View style={[styles.folderIconBox, { backgroundColor: colors.primary }]}>
-              <MaterialIcons name="folder-special" size={24} color={colors.onPrimary} />
+            <View
+              style={[
+                styles.folderIconBox,
+                { backgroundColor: colors.primary },
+              ]}
+            >
+              <MaterialIcons
+                name="folder-special"
+                size={24}
+                color={colors.onPrimary}
+              />
             </View>
             <M3Badge
               label={`${album?.media_count ?? totalCount} items`}
@@ -198,7 +239,7 @@ export default function AlbumGalleryScreen() {
           </View>
 
           <Text style={styles.albumTitle} numberOfLines={2}>
-            {album?.name || 'Album Collection'}
+            {album?.name || "Album Collection"}
           </Text>
 
           <Text style={styles.albumPath} numberOfLines={1}>
@@ -220,12 +261,19 @@ export default function AlbumGalleryScreen() {
               const target = mediaItems[0];
               if (target) {
                 router.push({
-                  pathname: '/shorts',
-                  params: { mediaId: target.id.toString(), albumId: albumId.toString() },
+                  pathname: "/shorts",
+                  params: {
+                    mediaId: target.id.toString(),
+                    albumId: albumId.toString(),
+                    mediaType: type,
+                    sortBy,
+                    sortOrder,
+                    ...(searchQuery ? { searchQuery } : {}),
+                  },
                 });
               }
             }}
-            style={{ marginTop: Spacing.two, alignSelf: 'flex-start' }}
+            style={{ marginTop: Spacing.two, alignSelf: "flex-start" }}
           />
         </View>
       </View>
@@ -252,11 +300,11 @@ export default function AlbumGalleryScreen() {
         >
           <MaterialIcons
             name={
-              layoutMode === 'grid'
-                ? 'grid-view'
-                : layoutMode === 'grid3'
-                ? 'view-compact'
-                : 'view-list'
+              layoutMode === "grid"
+                ? "grid-view"
+                : layoutMode === "grid3"
+                  ? "view-compact"
+                  : "view-list"
             }
             size={22}
             color={colors.onSurface}
@@ -278,35 +326,46 @@ export default function AlbumGalleryScreen() {
       {/* Sort & Metrics Bar */}
       <View style={styles.metricsBar}>
         <Text style={[styles.metricsLabel, { color: colors.onSurfaceVariant }]}>
-          {totalCount.toLocaleString()}{' '}
-          {type === 'image' ? 'Photos' : type === 'video' ? 'Videos' : 'Items'} in Album
+          {totalCount.toLocaleString()}{" "}
+          {type === "image" ? "Photos" : type === "video" ? "Videos" : "Items"}{" "}
+          in Album
         </Text>
 
         <View style={styles.sortControlsRow}>
           <Pressable
             onPress={() => {
-              if (sortBy === 'created_at') setSortBy('file_size');
-              else if (sortBy === 'file_size') setSortBy('current_relative_path');
-              else setSortBy('created_at');
+              if (sortBy === "created_at") setSortBy("file_size");
+              else if (sortBy === "file_size")
+                setSortBy("current_relative_path");
+              else setSortBy("created_at");
               setPage(1);
             }}
             style={styles.sortBtn}
           >
-            <MaterialIcons name="sort" size={16} color={colors.primary} style={{ marginRight: 2 }} />
+            <MaterialIcons
+              name="sort"
+              size={16}
+              color={colors.primary}
+              style={{ marginRight: 2 }}
+            />
             <Text style={[styles.sortBtnText, { color: colors.primary }]}>
-              {sortBy === 'created_at' ? 'Date' : sortBy === 'file_size' ? 'Size' : 'Name'}
+              {sortBy === "created_at"
+                ? "Date"
+                : sortBy === "file_size"
+                  ? "Size"
+                  : "Name"}
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => {
-              setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+              setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
               setPage(1);
             }}
             style={{ padding: 4 }}
           >
             <MaterialIcons
-              name={sortOrder === 'ASC' ? 'arrow-upward' : 'arrow-downward'}
+              name={sortOrder === "ASC" ? "arrow-upward" : "arrow-downward"}
               size={18}
               color={colors.primary}
             />
@@ -340,12 +399,18 @@ export default function AlbumGalleryScreen() {
       ) : mediaItems.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContainer}>
           {renderHeader()}
-          <View style={styles.emptyStateBox}>
-            <MaterialIcons name="folder-open" size={54} color={colors.outline} />
+          <View style={styles.noResultsBox}>
+            <MaterialIcons
+              name="folder-open"
+              size={54}
+              color={colors.outline}
+            />
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-              {searchQuery ? 'No matching items in album' : 'Album is Empty'}
+              {searchQuery ? "No matching items in album" : "Album is Empty"}
             </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
+            <Text
+              style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}
+            >
               No media items found matching current filters inside this album.
             </Text>
           </View>
@@ -386,113 +451,126 @@ const styles = StyleSheet.create({
   heroCard: {
     height: 160,
     borderRadius: Shapes.large,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: Spacing.three,
     marginTop: Spacing.two,
     borderWidth: 1,
-    position: 'relative',
+    position: "relative",
     ...Elevation.level2,
   },
   heroOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: "rgba(0,0,0,0.65)",
     padding: Spacing.three,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   heroTopRow: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.three,
     left: Spacing.three,
     right: Spacing.three,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   folderIconBox: {
     width: 40,
     height: 40,
     borderRadius: Shapes.small,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   albumTitle: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: "900",
     letterSpacing: -0.3,
   },
   albumPath: {
-    color: 'rgba(255,255,255,0.75)',
+    color: "rgba(255,255,255,0.75)",
     fontSize: 12,
     marginTop: 2,
   },
   albumDesc: {
-    color: 'rgba(255,255,255,0.6)',
+    color: "rgba(255,255,255,0.6)",
     fontSize: 11,
     marginTop: 4,
   },
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   layoutToggleBtn: {
     width: 48,
     height: 48,
     borderRadius: Shapes.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
   },
   metricsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: Spacing.two,
     paddingHorizontal: 4,
   },
   metricsLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   sortControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   sortBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Shapes.small,
   },
   sortBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
+  },
+  orderBtn: {
+    padding: 4,
   },
   listContent: {
     paddingHorizontal: Spacing.four,
     maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
+    alignSelf: "center",
+    width: "100%",
   },
   emptyContainer: {
     flex: 1,
     padding: Spacing.four,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  emptyStateBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  emptyCard: {
+    alignItems: "center",
+    paddingVertical: Spacing.five,
+    paddingHorizontal: Spacing.four,
+    width: "100%",
+    maxWidth: 420,
+  },
+  noResultsBox: {
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.six,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: "800",
     marginTop: Spacing.two,
   },
   emptySubtitle: {
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: Spacing.one,
     lineHeight: 18,
   },

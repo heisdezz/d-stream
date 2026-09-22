@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useDebounce } from '@/hooks/use-debounce';
+import React, { useEffect, useRef, useState } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   useWindowDimensions,
   Pressable,
   ScrollView,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAtom } from 'jotai';
-import { LegendList, LegendListRef } from '@legendapp/list/react-native';
-import { useMaterialTheme } from '@/hooks/use-material-theme';
-import { useAppStore } from '@/store/use-app-store';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAtom } from "jotai";
+import { LegendList, LegendListRef } from "@legendapp/list/react-native";
+import { useMaterialTheme } from "@/hooks/use-material-theme";
+import { useAppStore } from "@/store/use-app-store";
 import {
   searchQueryAtom,
   mediaTypeFilterAtom,
@@ -25,24 +25,30 @@ import {
   currentPageAtom,
   pageSizeAtom,
   MediaTypeFilter,
-} from '@/store/atoms';
-import { Spacing, Shapes, MaxContentWidth } from '@/constants/theme';
-import { M3SearchBar } from '@/components/material/m3-search-bar';
-import { M3SegmentedRow, SegmentItem } from '@/components/material/m3-segmented-row';
-import { M3Chip } from '@/components/material/m3-chip';
-import { M3Button } from '@/components/material/m3-button';
-import { M3Card } from '@/components/material/m3-card';
-import { MediaGridItem } from '@/components/media/media-grid-item';
-import { MediaListItem } from '@/components/media/media-list-item';
-import { PaginationBar } from '@/components/media/pagination-bar';
-import { ScreenLoader, ScreenTransition } from '@/components/common/screen-loader';
-import { MediaItem } from '@/types/models';
-import { MaterialIcons } from '@expo/vector-icons';
+} from "@/store/atoms";
+import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
+import { M3SearchBar } from "@/components/material/m3-search-bar";
+import {
+  M3SegmentedRow,
+  SegmentItem,
+} from "@/components/material/m3-segmented-row";
+import { M3Chip } from "@/components/material/m3-chip";
+import { M3Button } from "@/components/material/m3-button";
+import { M3Card } from "@/components/material/m3-card";
+import { MediaGridItem } from "@/components/media/media-grid-item";
+import { MediaListItem } from "@/components/media/media-list-item";
+import { PaginationBar } from "@/components/media/pagination-bar";
+import {
+  ScreenLoader,
+  ScreenTransition,
+} from "@/components/common/screen-loader";
+import { MediaItem } from "@/types/models";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const typeSegments: SegmentItem<MediaTypeFilter>[] = [
-  { value: 'all', label: 'All', icon: 'perm-media' },
-  { value: 'image', label: 'Photos', icon: 'image' },
-  { value: 'video', label: 'Videos', icon: 'videocam' },
+  { value: "all", label: "All", icon: "perm-media" },
+  { value: "image", label: "Photos", icon: "image" },
+  { value: "video", label: "Videos", icon: "videocam" },
 ];
 
 export default function MediaExplorerScreen() {
@@ -127,6 +133,11 @@ export default function MediaExplorerScreen() {
         params: {
           mediaId: item.id.toString(),
           ...(selectedAlbumId ? { albumId: selectedAlbumId.toString() } : {}),
+          ...(selectedTagId ? { tagId: selectedTagId.toString() } : {}),
+          mediaType: type,
+          sortBy,
+          sortOrder,
+          ...(query ? { searchQuery: query } : {}),
         },
       });
     } else {
@@ -135,30 +146,31 @@ export default function MediaExplorerScreen() {
   };
 
   const toggleLayoutMode = () => {
-    if (layoutMode === 'grid') setLayoutMode('grid3');
-    else if (layoutMode === 'grid3') setLayoutMode('list');
-    else setLayoutMode('grid');
+    if (layoutMode === "grid") setLayoutMode("grid3");
+    else if (layoutMode === "grid3") setLayoutMode("list");
+    else setLayoutMode("grid");
   };
 
   const activeAlbum = albums.find((a) => a.id === selectedAlbumId);
   const activeTag = tags.find((t) => t.id === selectedTagId);
 
   const contentWidth = Math.min(width - Spacing.four * 2, MaxContentWidth);
-  const numColumns = layoutMode === 'list' ? 1 : layoutMode === 'grid3' ? 3 : 2;
+  const numColumns = layoutMode === "list" ? 1 : layoutMode === "grid3" ? 3 : 2;
   const gridItemWidth =
-    layoutMode === 'grid3'
+    layoutMode === "grid3"
       ? (contentWidth - Spacing.two * 2) / 3
       : (contentWidth - Spacing.two) / 2;
 
-  const estimatedSize = layoutMode === 'list' ? 88 : Math.round(gridItemWidth * 1.1);
+  const estimatedSize =
+    layoutMode === "list" ? 88 : Math.round(gridItemWidth * 1.1);
 
   const renderItem = ({ item }: { item: MediaItem }) => {
-    if (layoutMode === 'list') {
+    if (layoutMode === "list") {
       return (
         <MediaListItem
           item={item}
           onPress={handleMediaPress}
-          serverIp={syncStatus === 'connected' ? ip : undefined}
+          serverIp={syncStatus === "connected" ? ip : undefined}
           serverPort={port}
         />
       );
@@ -167,16 +179,16 @@ export default function MediaExplorerScreen() {
       <View
         style={{
           width: gridItemWidth,
-          marginRight: layoutMode === 'grid3' ? Spacing.one + 2 : Spacing.two,
+          marginRight: layoutMode === "grid3" ? Spacing.one + 2 : Spacing.two,
         }}
       >
         <MediaGridItem
           item={item}
           onPress={handleMediaPress}
           width={gridItemWidth}
-          serverIp={syncStatus === 'connected' ? ip : undefined}
+          serverIp={syncStatus === "connected" ? ip : undefined}
           serverPort={port}
-          aspectRatio={layoutMode === 'grid3' ? 1 : 1.1}
+          aspectRatio={layoutMode === "grid3" ? 1 : 1.1}
         />
       </View>
     );
@@ -208,11 +220,11 @@ export default function MediaExplorerScreen() {
         >
           <MaterialIcons
             name={
-              layoutMode === 'grid'
-                ? 'grid-view'
-                : layoutMode === 'grid3'
-                ? 'view-compact'
-                : 'view-list'
+              layoutMode === "grid"
+                ? "grid-view"
+                : layoutMode === "grid3"
+                  ? "view-compact"
+                  : "view-list"
             }
             size={22}
             color={colors.onSurface}
@@ -299,35 +311,49 @@ export default function MediaExplorerScreen() {
       {/* Metrics Bar & Sort Controls */}
       <View style={styles.metricsBar}>
         <Text style={[styles.resultsLabel, { color: colors.onSurfaceVariant }]}>
-          {totalMediaCount.toLocaleString()}{' '}
-          {type === 'image' ? 'Photos' : type === 'video' ? 'Videos' : 'Total Items'}
+          {totalMediaCount.toLocaleString()}{" "}
+          {type === "image"
+            ? "Photos"
+            : type === "video"
+              ? "Videos"
+              : "Total Items"}
         </Text>
 
         <View style={styles.sortControlsRow}>
           <Pressable
             onPress={() => {
-              if (sortBy === 'created_at') setSortBy('file_size');
-              else if (sortBy === 'file_size') setSortBy('current_relative_path');
-              else setSortBy('created_at');
+              if (sortBy === "created_at") setSortBy("file_size");
+              else if (sortBy === "file_size")
+                setSortBy("current_relative_path");
+              else setSortBy("created_at");
               setCurrentPage(1);
             }}
             style={styles.sortBtn}
           >
-            <MaterialIcons name="sort" size={16} color={colors.primary} style={{ marginRight: 2 }} />
+            <MaterialIcons
+              name="sort"
+              size={16}
+              color={colors.primary}
+              style={{ marginRight: 2 }}
+            />
             <Text style={[styles.sortBtnText, { color: colors.primary }]}>
-              {sortBy === 'created_at' ? 'Date' : sortBy === 'file_size' ? 'Size' : 'Name'}
+              {sortBy === "created_at"
+                ? "Date"
+                : sortBy === "file_size"
+                  ? "Size"
+                  : "Name"}
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => {
-              setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+              setSortOrder(sortOrder === "ASC" ? "DESC" : "ASC");
               setCurrentPage(1);
             }}
             style={styles.orderBtn}
           >
             <MaterialIcons
-              name={sortOrder === 'ASC' ? 'arrow-upward' : 'arrow-downward'}
+              name={sortOrder === "ASC" ? "arrow-upward" : "arrow-downward"}
               size={18}
               color={colors.primary}
             />
@@ -359,15 +385,18 @@ export default function MediaExplorerScreen() {
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
               No Offline Database
             </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-              Connect to your external drive sync server over LAN and download the library database to search and view offline.
+            <Text
+              style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}
+            >
+              Connect to your external drive sync server over LAN and download
+              the library database to search and view offline.
             </Text>
             <M3Button
               label="Open Sync Settings"
               icon="sync"
               variant="filled"
               style={{ marginTop: Spacing.three }}
-              onPress={() => router.push('/sync')}
+              onPress={() => router.push("/sync")}
             />
           </M3Card>
         </View>
@@ -385,8 +414,11 @@ export default function MediaExplorerScreen() {
             <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
               No items matching filters
             </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}>
-              Try clearing your search query or selecting a different album / media category.
+            <Text
+              style={[styles.emptySubtitle, { color: colors.onSurfaceVariant }]}
+            >
+              Try clearing your search query or selecting a different album /
+              media category.
             </Text>
           </View>
         </ScrollView>
@@ -435,50 +467,50 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two,
   },
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingTop: Spacing.two,
   },
   layoutToggleBtn: {
     width: 48,
     height: 48,
     borderRadius: Shapes.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
   },
   horizontalChipsScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 4,
   },
   metricsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: Spacing.two,
     paddingHorizontal: 4,
   },
   resultsLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.2,
   },
   sortControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   sortBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Shapes.small,
   },
   sortBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: "800",
   },
   orderBtn: {
     padding: 4,
@@ -486,35 +518,35 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: Spacing.four,
     maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
+    alignSelf: "center",
+    width: "100%",
   },
   emptyContainer: {
     flex: 1,
     padding: Spacing.four,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyCard: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.five,
     paddingHorizontal: Spacing.four,
-    width: '100%',
+    width: "100%",
     maxWidth: 420,
   },
   noResultsBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.six,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: "800",
     marginTop: Spacing.two,
   },
   emptySubtitle: {
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: Spacing.one,
     lineHeight: 18,
   },
