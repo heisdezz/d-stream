@@ -1,6 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { Platform, PermissionsAndroid } from "react-native";
-import axios from "axios";
 import { toast } from "sonner-native";
 import { getMediaStreamUrl, getThumbnailUrl } from "@/services/sync-api";
 import {
@@ -9,6 +8,8 @@ import {
   DownloadedItemRecord,
 } from "@/services/storage";
 import { MediaItem } from "@/types/models";
+import { downloadInBackground, hasBackgroundDownloader } from "./background-downloader";
+import { notifyDownload } from "./download-notifications";
 
 export interface DownloadProgress {
   mediaId: number;
@@ -165,7 +166,10 @@ export async function downloadMediaItem(
   record?: DownloadedItemRecord;
   error?: string;
 }> {
-  const toastId = `dl-${item.id}` || `dl-${Date.now()}`;
+  const toastId = `dl-${item.id}`;
+  const notificationFileName = item.current_relative_path.replace(/\\/g, "/").split("/").pop() || `media_${item.id}`;
+  let completed = false;
+  let usesExpoTransport = false;
   console.log("[Downloader] ===== downloadMediaItem START =====", {
     itemId: item.id,
     fileSize: item.file_size,
@@ -175,7 +179,27 @@ export async function downloadMediaItem(
   try {
     const streamUrl = getMediaStreamUrl(ip, port, item.id);
     const fileName =
-      item.current_relative_path.split("/").pop() || `media_${item.id}`;
+      sanitizeFolderName(item.current_relative_path.replace(/\\/g, "/").split("/").pop() || `media_${item.id}`);
+    if (hasBackgroundDownloader) {
+      const location = (await getSavedDownloadLocation()).split(/[\\/]/)
+        .filter((part) => part && part !== "." && part !== "..")
+        .map(sanitizeFolderName).join("/");
+      const albumName = item.album_name || "Uncategorized";
+      return await downloadInBackground(
+        streamUrl,
+        `${location}/${sanitizeFolderName(albumName)}/${fileName}`,
+        {
+          mediaId: item.id,
+          localUri: "", // Assigned by the native module before the job is persisted.
+          albumName,
+          fileName,
+          fileSize: item.file_size,
+          mimeType: item.mime_type,
+          downloadedAt: "",
+          thumbnailUrl: getThumbnailUrl(ip, port, item.id),
+        },
+      );
+    }
     const destDir = await resolveDestinationDirectory(item.album_name);
     const destFilePath = `${destDir}${fileName}`;
 
@@ -195,30 +219,32 @@ export async function downloadMediaItem(
       destFilePath,
     });
 
+    usesExpoTransport = true;
+    await notifyDownload(item.id, notificationFileName, "downloading");
+
     toast.loading(`Downloading ${fileName}... 0%`, { id: toastId });
+
+    let lastProgressAt = 0;
+    let lastPercentage = -1;
 
     const downloadResumable = FileSystem.createDownloadResumable(
       streamUrl,
       destFilePath,
-      {},
+      { sessionType: FileSystem.FileSystemSessionType.BACKGROUND },
       (progressData) => {
         const totalWritten = progressData.totalBytesWritten;
         const totalExpected =
-          progressData.totalBytesExpectedToWrite || item.file_size || 1;
+          progressData.totalBytesExpectedToWrite > 0
+            ? progressData.totalBytesExpectedToWrite : item.file_size || 1;
         const pct = Math.min(
           100,
           Math.round((totalWritten / totalExpected) * 100),
         );
 
-        console.log("[Downloader] progress:", {
-          itemId: item.id,
-          totalWritten,
-          expectedFromServer: progressData.totalBytesExpectedToWrite,
-          expectedUsed: totalExpected,
-          pct,
-        });
-
-        toast.loading(`Downloading ${fileName}... ${pct}%`, { id: toastId });
+        const now = Date.now();
+        if (now - lastProgressAt < 500 || pct === lastPercentage) return;
+        lastProgressAt = now;
+        lastPercentage = pct;
 
         onProgress?.({
           mediaId: item.id,
@@ -273,7 +299,7 @@ export async function downloadMediaItem(
         thumbUrl,
         thumbDestPath,
       );
-      if (thumbResult && thumbResult.uri) {
+      if (thumbResult?.status === 200 && thumbResult.uri) {
         thumbnailLocalUri = thumbResult.uri;
         console.log(
           "[Downloader] Saved thumbnail to .thumbs:",
@@ -299,6 +325,7 @@ export async function downloadMediaItem(
     };
 
     await saveDownloadedItemRecord(record);
+    completed = true;
     console.log("[Downloader] ===== SUCCESS =====", {
       localUri: result.uri,
       savedSize: fileCheck.size,
@@ -327,5 +354,9 @@ export async function downloadMediaItem(
       id: toastId,
     });
     return { success: false, error: err?.message || "Download error" };
+  } finally {
+    if (usesExpoTransport) {
+      void notifyDownload(item.id, notificationFileName, completed ? "completed" : "failed");
+    }
   }
 }

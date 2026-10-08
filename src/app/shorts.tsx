@@ -20,10 +20,11 @@ import {
   StatusBar,
   ViewToken,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
-import { useVideoPlayer, VideoView } from "expo-video";
+import { VideoView } from "expo-video";
+import { useAsyncVideoPlayer } from "@/hooks/use-async-video-player";
 import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomSheet, {
@@ -39,7 +40,6 @@ import { useAppStore } from "@/store/use-app-store";
 import { getMediaItems, getMediaItemById } from "@/services/local-db";
 import { getMediaStreamUrl, getThumbnailUrl } from "@/services/sync-api";
 import { MediaItem } from "@/types/models";
-import { DownloadProgress } from "@/services/downloader";
 import { Spacing } from "@/constants/theme";
 import { M3Button } from "@/components/material/m3-button";
 
@@ -61,7 +61,6 @@ function formatDuration(seconds: number | null): string {
 interface ShortsMediaCardProps {
   item: MediaItem;
   isActive: boolean;
-  isNeighbor: boolean;
   isMuted: boolean;
   containerHeight: number;
   containerWidth: number;
@@ -70,7 +69,7 @@ interface ShortsMediaCardProps {
   isConnected: boolean;
   isDownloaded: boolean;
   localUri?: string;
-  activeDownload?: DownloadProgress;
+  thumbnailLocalUri?: string;
   onToggleMute: () => void;
   onOpenDetails: (item: MediaItem) => void;
   onLike: (itemId: number) => void;
@@ -89,7 +88,6 @@ interface ShortsMediaCardProps {
 const ShortsMediaCard = React.memo(function ShortsMediaCard({
   item,
   isActive,
-  isNeighbor,
   isMuted,
   containerHeight,
   containerWidth,
@@ -98,7 +96,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
   isConnected,
   isDownloaded,
   localUri,
-  activeDownload,
+  thumbnailLocalUri,
   onToggleMute,
   onOpenDetails,
   onLike,
@@ -116,6 +114,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
   const insets = useSafeAreaInsets();
   const bottomSafeArea = Math.max(insets.bottom, 16);
   const isVideo = item.mime_type.startsWith("video/");
+  const activeDownload = useAppStore((state) => state.activeDownloads[item.id]);
   const lastTapRef = useRef<number>(0);
 
   // Play/Pause icon animation
@@ -150,15 +149,9 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
     return null;
   }, [localUri, isConnected, streamUrl]);
 
-  // Video Player - only load decoder for active and immediate neighbor
-  const shouldLoadPlayer = isVideo && playUri && (isActive || isNeighbor);
-  const player = useVideoPlayer(shouldLoadPlayer ? playUri : null, (p) => {
-    p.loop = true;
-    p.muted = isMuted;
-    if (isActive) {
-      p.play();
-    }
-  });
+  // Neighbors show thumbnails; only the visible video consumes network/decoder buffers.
+  const shouldLoadPlayer = isVideo && playUri && isActive;
+  const player = useAsyncVideoPlayer(shouldLoadPlayer ? playUri : null, true, isActive);
 
   useEffect(() => {
     if (!player) return;
@@ -174,7 +167,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
 
   // Track video progress for Seekbar
   useEffect(() => {
-    if (!player || !isVideo) return;
+    if (!player || !isVideo || !isActive) return;
     player.timeUpdateEventInterval = 0.2;
     const sub = player.addListener("timeUpdate", (event) => {
       setCurrentTime(event.currentTime);
@@ -186,7 +179,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
     return () => {
       sub.remove();
     };
-  }, [player, isVideo]);
+  }, [player, isVideo, isActive]);
 
   const triggerHeartAnimation = () => {
     setShowHeartBurst(true);
@@ -273,7 +266,7 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
             />
           ) : (
             <Image
-              source={{ uri: thumbnailUrl || playUri || undefined }}
+              source={{ uri: thumbnailLocalUri || thumbnailUrl || playUri || undefined }}
               style={StyleSheet.absoluteFill}
               contentFit="contain"
               transition={200}
@@ -353,31 +346,31 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
             { paddingTop: insets.top + Spacing.two },
           ]}
         >
-        <Pressable
-          onPress={onBack}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={tw`w-11 h-11 rounded-full bg-black/55 items-center justify-center`}
-        >
-          <MaterialIcons name="close" size={22} color="#FFFFFF" />
-        </Pressable>
+          <Pressable
+            onPress={onBack}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={tw`w-11 h-11 rounded-full bg-black/55 items-center justify-center`}
+          >
+            <MaterialIcons name="close" size={22} color="#FFFFFF" />
+          </Pressable>
 
-        <View style={tw`items-center max-w-[65%]`}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {contextLabel}
-          </Text>
-          <Text style={tw`text-[11px] text-white/80 mt-0.5 font-bold`}>
-            {currentIndex + 1} of {totalCount}
-          </Text>
+          <View style={tw`items-center max-w-[65%]`}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {contextLabel}
+            </Text>
+            <Text style={tw`text-[11px] text-white/80 mt-0.5 font-bold`}>
+              {currentIndex + 1} of {totalCount}
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => onOpenInspector(item.id)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            style={tw`w-11 h-11 rounded-full bg-black/55 items-center justify-center`}
+          >
+            <MaterialIcons name="open-in-new" size={20} color="#FFFFFF" />
+          </Pressable>
         </View>
-
-        <Pressable
-          onPress={() => onOpenInspector(item.id)}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          style={tw`w-11 h-11 rounded-full bg-black/55 items-center justify-center`}
-        >
-          <MaterialIcons name="open-in-new" size={20} color="#FFFFFF" />
-        </Pressable>
-      </View>
       )}
 
       {/* Floating Right Action Rail (TikTok / Reels style) */}
@@ -388,125 +381,125 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
             { bottom: bottomSafeArea + 18 },
           ]}
         >
-        {/* Like Button */}
-        <Pressable
-          onPress={() => {
-            onLike(item.id);
-            if (!isLiked) triggerHeartAnimation();
-          }}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={tw`items-center`}
-        >
-          <View
-            style={[
-              tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`,
-              isLiked && { backgroundColor: "rgba(255, 45, 85, 0.3)" },
-            ]}
-          >
-            <MaterialIcons
-              name={isLiked ? "favorite" : "favorite-border"}
-              size={26}
-              color={isLiked ? "#FF2D55" : "#FFFFFF"}
-            />
-          </View>
-          <Text style={styles.actionLabel}>{isLiked ? "Liked" : "Like"}</Text>
-        </Pressable>
-
-        {/* Audio Mute/Unmute Toggle (Video only) */}
-        {isVideo && (
+          {/* Like Button */}
           <Pressable
-            onPress={onToggleMute}
+            onPress={() => {
+              onLike(item.id);
+              if (!isLiked) triggerHeartAnimation();
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={tw`items-center`}
+          >
+            <View
+              style={[
+                tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`,
+                isLiked && { backgroundColor: "rgba(255, 45, 85, 0.3)" },
+              ]}
+            >
+              <MaterialIcons
+                name={isLiked ? "favorite" : "favorite-border"}
+                size={26}
+                color={isLiked ? "#FF2D55" : "#FFFFFF"}
+              />
+            </View>
+            <Text style={styles.actionLabel}>{isLiked ? "Liked" : "Like"}</Text>
+          </Pressable>
+
+          {/* Audio Mute/Unmute Toggle (Video only) */}
+          {isVideo && (
+            <Pressable
+              onPress={onToggleMute}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={tw`items-center`}
+            >
+              <View
+                style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
+              >
+                <MaterialIcons
+                  name={isMuted ? "volume-off" : "volume-up"}
+                  size={24}
+                  color="#FFFFFF"
+                />
+              </View>
+              <Text style={styles.actionLabel}>
+                {isMuted ? "Muted" : "Audio"}
+              </Text>
+            </Pressable>
+          )}
+
+          {/* Download Offline Button */}
+          <Pressable
+            onPress={() => onDownload(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={tw`items-center`}
+          >
+            <View
+              style={[
+                tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`,
+                isDownloaded && { backgroundColor: "rgba(16, 185, 129, 0.3)" },
+              ]}
+            >
+              {activeDownload ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <MaterialIcons
+                  name={isDownloaded ? "check-circle" : "file-download"}
+                  size={25}
+                  color={isDownloaded ? "#34D399" : "#FFFFFF"}
+                />
+              )}
+            </View>
+            <Text style={styles.actionLabel}>
+              {activeDownload
+                ? `${activeDownload.percentage}%`
+                : isDownloaded
+                  ? "Saved"
+                  : "Save"}
+            </Text>
+          </Pressable>
+
+          {/* Metadata Details Sheet Button */}
+          <Pressable
+            onPress={() => onOpenDetails(item)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={tw`items-center`}
           >
             <View
               style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
             >
-              <MaterialIcons
-                name={isMuted ? "volume-off" : "volume-up"}
-                size={24}
-                color="#FFFFFF"
-              />
+              <MaterialIcons name="info-outline" size={24} color="#FFFFFF" />
             </View>
-            <Text style={styles.actionLabel}>
-              {isMuted ? "Muted" : "Audio"}
-            </Text>
+            <Text style={styles.actionLabel}>Info</Text>
           </Pressable>
-        )}
 
-        {/* Download Offline Button */}
-        <Pressable
-          onPress={() => onDownload(item)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={tw`items-center`}
-        >
-          <View
-            style={[
-              tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`,
-              isDownloaded && { backgroundColor: "rgba(16, 185, 129, 0.3)" },
-            ]}
+          {/* Share Button */}
+          <Pressable
+            onPress={() => onShare(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={tw`items-center`}
           >
-            {activeDownload ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <MaterialIcons
-                name={isDownloaded ? "check-circle" : "file-download"}
-                size={25}
-                color={isDownloaded ? "#34D399" : "#FFFFFF"}
-              />
-            )}
-          </View>
-          <Text style={styles.actionLabel}>
-            {activeDownload
-              ? `${activeDownload.percentage}%`
-              : isDownloaded
-                ? "Saved"
-                : "Save"}
-          </Text>
-        </Pressable>
+            <View
+              style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
+            >
+              <MaterialIcons name="share" size={24} color="#FFFFFF" />
+            </View>
+            <Text style={styles.actionLabel}>Share</Text>
+          </Pressable>
 
-        {/* Metadata Details Sheet Button */}
-        <Pressable
-          onPress={() => onOpenDetails(item)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={tw`items-center`}
-        >
-          <View
-            style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
+          {/* Clear Screen Button */}
+          <Pressable
+            onPress={onToggleClearMode}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={tw`items-center`}
           >
-            <MaterialIcons name="info-outline" size={24} color="#FFFFFF" />
-          </View>
-          <Text style={styles.actionLabel}>Info</Text>
-        </Pressable>
-
-        {/* Share Button */}
-        <Pressable
-          onPress={() => onShare(item)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={tw`items-center`}
-        >
-          <View
-            style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
-          >
-            <MaterialIcons name="share" size={24} color="#FFFFFF" />
-          </View>
-          <Text style={styles.actionLabel}>Share</Text>
-        </Pressable>
-
-        {/* Clear Screen Button */}
-        <Pressable
-          onPress={onToggleClearMode}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={tw`items-center`}
-        >
-          <View
-            style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
-          >
-            <MaterialIcons name="visibility-off" size={24} color="#FFFFFF" />
-          </View>
-          <Text style={styles.actionLabel}>Clear</Text>
-        </Pressable>
-      </View>
+            <View
+              style={tw`w-12 h-12 rounded-full bg-black/55 items-center justify-center border border-white/15`}
+            >
+              <MaterialIcons name="visibility-off" size={24} color="#FFFFFF" />
+            </View>
+            <Text style={styles.actionLabel}>Clear</Text>
+          </Pressable>
+        </View>
       )}
 
       {/* Floating Bottom Info Overlay */}
@@ -517,81 +510,81 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
             { bottom: isVideo ? bottomSafeArea + 22 : bottomSafeArea + 6 },
           ]}
         >
-        {/* Album Badge */}
-        {item.album_name && (
-          <View
-            style={tw`flex-row items-center self-start bg-black/60 px-2.5 py-1 rounded-full mb-1 border border-white/20`}
-          >
-            <MaterialIcons
-              name="folder"
-              size={13}
-              color="#FFFFFF"
-              style={{ marginRight: 4 }}
-            />
-            <Text style={tw`text-xs font-bold text-white`} numberOfLines={1}>
-              {item.album_name}
-            </Text>
-          </View>
-        )}
-
-        {/* Title / Current Relative Path */}
-        <Text style={styles.mediaTitle} numberOfLines={2}>
-          {item.current_relative_path || item.original_relative_path}
-        </Text>
-
-        {/* Metadata Chips: Duration, Resolution, Size */}
-        <View style={tw`flex-row flex-wrap gap-1.5 items-center`}>
-          {item.duration_seconds ? (
+          {/* Album Badge */}
+          {item.album_name && (
             <View
-              style={tw`flex-row items-center bg-black/60 px-2 py-0.5 rounded border border-white/15`}
+              style={tw`flex-row items-center self-start bg-black/60 px-2.5 py-1 rounded-full mb-1 border border-white/20`}
             >
               <MaterialIcons
-                name="schedule"
-                size={12}
-                color="#E2E8F0"
-                style={{ marginRight: 3 }}
+                name="folder"
+                size={13}
+                color="#FFFFFF"
+                style={{ marginRight: 4 }}
               />
-              <Text style={tw`text-[11px] font-semibold text-slate-200`}>
-                {formatDuration(item.duration_seconds)}
+              <Text style={tw`text-xs font-bold text-white`} numberOfLines={1}>
+                {item.album_name}
               </Text>
             </View>
-          ) : null}
+          )}
 
-          {resolution ? (
+          {/* Title / Current Relative Path */}
+          <Text style={styles.mediaTitle} numberOfLines={2}>
+            {item.current_relative_path || item.original_relative_path}
+          </Text>
+
+          {/* Metadata Chips: Duration, Resolution, Size */}
+          <View style={tw`flex-row flex-wrap gap-1.5 items-center`}>
+            {item.duration_seconds ? (
+              <View
+                style={tw`flex-row items-center bg-black/60 px-2 py-0.5 rounded border border-white/15`}
+              >
+                <MaterialIcons
+                  name="schedule"
+                  size={12}
+                  color="#E2E8F0"
+                  style={{ marginRight: 3 }}
+                />
+                <Text style={tw`text-[11px] font-semibold text-slate-200`}>
+                  {formatDuration(item.duration_seconds)}
+                </Text>
+              </View>
+            ) : null}
+
+            {resolution ? (
+              <View
+                style={tw`bg-black/60 px-2 py-0.5 rounded border border-white/15`}
+              >
+                <Text style={tw`text-[11px] font-semibold text-slate-200`}>
+                  {resolution}
+                </Text>
+              </View>
+            ) : null}
+
             <View
               style={tw`bg-black/60 px-2 py-0.5 rounded border border-white/15`}
             >
               <Text style={tw`text-[11px] font-semibold text-slate-200`}>
-                {resolution}
+                {formatFileSize(item.file_size)}
               </Text>
             </View>
-          ) : null}
 
-          <View
-            style={tw`bg-black/60 px-2 py-0.5 rounded border border-white/15`}
-          >
-            <Text style={tw`text-[11px] font-semibold text-slate-200`}>
-              {formatFileSize(item.file_size)}
-            </Text>
+            {isDownloaded && (
+              <View
+                style={tw`flex-row items-center bg-emerald-500/40 px-2 py-0.5 rounded border border-emerald-400/30`}
+              >
+                <MaterialIcons
+                  name="offline-pin"
+                  size={12}
+                  color="#34D399"
+                  style={{ marginRight: 3 }}
+                />
+                <Text style={tw`text-[11px] font-semibold text-emerald-400`}>
+                  Offline
+                </Text>
+              </View>
+            )}
           </View>
-
-          {isDownloaded && (
-            <View
-              style={tw`flex-row items-center bg-emerald-500/40 px-2 py-0.5 rounded border border-emerald-400/30`}
-            >
-              <MaterialIcons
-                name="offline-pin"
-                size={12}
-                color="#34D399"
-                style={{ marginRight: 3 }}
-              />
-              <Text style={tw`text-[11px] font-semibold text-emerald-400`}>
-                Offline
-              </Text>
-            </View>
-          )}
         </View>
-      </View>
       )}
 
       {/* Interactive Video Seekbar */}
@@ -652,6 +645,11 @@ const ShortsMediaCard = React.memo(function ShortsMediaCard({
 });
 
 export default function ShortsScreen() {
+  const [isFocused, setIsFocused] = useState(false);
+  useFocusEffect(useCallback(() => {
+    setIsFocused(true);
+    return () => setIsFocused(false);
+  }, []));
   const router = useRouter();
   const { colors } = useMaterialTheme();
 
@@ -691,14 +689,11 @@ export default function ShortsScreen() {
     searchQuery?: string;
   }>();
 
-  const {
-    ip,
-    port,
-    status: syncStatus,
-    downloadedItems,
-    activeDownloads,
-    startDownloadMediaItem,
-  } = useAppStore();
+  const ip = useAppStore((state) => state.ip);
+  const port = useAppStore((state) => state.port);
+  const syncStatus = useAppStore((state) => state.status);
+  const downloadedItems = useAppStore((state) => state.downloadedItems);
+  const startDownloadMediaItem = useAppStore((state) => state.startDownloadMediaItem);
 
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -944,12 +939,10 @@ export default function ShortsScreen() {
 
   const renderItem = useCallback(
     ({ item, index }: { item: MediaItem; index: number }) => {
-      const isNeighbor = Math.abs(index - activeIndex) <= 1;
       return (
         <ShortsMediaCard
           item={item}
-          isActive={index === activeIndex}
-          isNeighbor={isNeighbor}
+          isActive={isFocused && index === activeIndex}
           isMuted={isMuted}
           containerHeight={containerDimensions.height}
           containerWidth={containerDimensions.width}
@@ -958,7 +951,7 @@ export default function ShortsScreen() {
           isConnected={syncStatus === "connected"}
           isDownloaded={!!downloadedItems[item.id]}
           localUri={downloadedItems[item.id]?.localUri}
-          activeDownload={activeDownloads[item.id]}
+          thumbnailLocalUri={downloadedItems[item.id]?.thumbnailLocalUri}
           onToggleMute={handleToggleMute}
           onOpenDetails={handleOpenDetails}
           onLike={handleLike}
@@ -977,6 +970,7 @@ export default function ShortsScreen() {
     },
     [
       activeIndex,
+      isFocused,
       isMuted,
       isClearMode,
       handleToggleClearMode,
@@ -986,7 +980,6 @@ export default function ShortsScreen() {
       port,
       syncStatus,
       downloadedItems,
-      activeDownloads,
       handleToggleMute,
       handleOpenDetails,
       handleLike,

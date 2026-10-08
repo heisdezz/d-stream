@@ -42,6 +42,7 @@
       "expo-font",
       "expo-sqlite",
       "expo-file-system",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {

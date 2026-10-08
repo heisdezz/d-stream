@@ -1,4 +1,5 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { Platform } from "react-native";
 import { SavedServer } from "@/types/models";
 
 export const DEFAULT_SERVER_IP = "192.168.1.100";
@@ -53,6 +54,8 @@ const defaultData: AppStorageData = {
 
 let memoryCache: AppStorageData = { ...defaultData };
 let isLoaded = false;
+let pendingLoad: Promise<AppStorageData> | undefined;
+let pendingSave: Promise<void> = Promise.resolve();
 
 function getStorageFilePath(): string {
   const baseDir =
@@ -62,6 +65,11 @@ function getStorageFilePath(): string {
 
 async function loadDataFromDisk(): Promise<AppStorageData> {
   if (isLoaded) return memoryCache;
+  pendingLoad ??= readDataFromDisk();
+  return pendingLoad;
+}
+
+async function readDataFromDisk(): Promise<AppStorageData> {
   try {
     const filePath = getStorageFilePath();
     const info = await FileSystem.getInfoAsync(filePath);
@@ -77,13 +85,25 @@ async function loadDataFromDisk(): Promise<AppStorageData> {
   return memoryCache;
 }
 
-async function saveDataToDisk(): Promise<void> {
-  try {
+async function saveDataToDisk(strict = false): Promise<void> {
+  const save = pendingSave.catch(() => {}).then(async () => {
     const filePath = getStorageFilePath();
-    const content = JSON.stringify(memoryCache, null, 2);
-    await FileSystem.writeAsStringAsync(filePath, content);
+    const content = JSON.stringify(memoryCache);
+    // iOS writes are already atomic; its moveAsync deletes the old file first.
+    if (Platform.OS === "ios") {
+      await FileSystem.writeAsStringAsync(filePath, content);
+      return;
+    }
+    const temporaryPath = `${filePath}.tmp`;
+    await FileSystem.writeAsStringAsync(temporaryPath, content);
+    await FileSystem.moveAsync({ from: temporaryPath, to: filePath });
+  });
+  pendingSave = save;
+  try {
+    await save;
   } catch (err) {
     console.warn("[Storage] Failed to save settings to disk:", err);
+    if (strict) throw err;
   }
 }
 
@@ -200,7 +220,7 @@ export async function saveDownloadedItemRecord(
   currentMap[record.mediaId] = record;
   data.downloadedItems = currentMap;
   memoryCache.downloadedItems = currentMap;
-  await saveDataToDisk();
+  await saveDataToDisk(true);
   return { ...currentMap };
 }
 

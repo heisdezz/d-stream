@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,11 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { VideoView } from 'expo-video';
+import { useAsyncVideoPlayer } from '@/hooks/use-async-video-player';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useSetAtom } from 'jotai';
@@ -52,6 +53,11 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default function MediaDetailScreen() {
+  const [isFocused, setIsFocused] = useState(false);
+  useFocusEffect(useCallback(() => {
+    setIsFocused(true);
+    return () => setIsFocused(false);
+  }, []));
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useMaterialTheme();
@@ -59,16 +65,14 @@ export default function MediaDetailScreen() {
   const { width } = useWindowDimensions();
 
   const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
-  const {
-    ip,
-    port,
-    status: syncStatus,
-    downloadLocation,
-    downloadedItems,
-    activeDownloads,
-    startDownloadMediaItem,
-    removeDownloadedMediaItem,
-  } = useAppStore();
+  const ip = useAppStore((state) => state.ip);
+  const port = useAppStore((state) => state.port);
+  const syncStatus = useAppStore((state) => state.status);
+  const downloadLocation = useAppStore((state) => state.downloadLocation);
+  const downloadedItems = useAppStore((state) => state.downloadedItems);
+  const activeDl = useAppStore((state) => state.activeDownloads[Number(id)]);
+  const startDownloadMediaItem = useAppStore((state) => state.startDownloadMediaItem);
+  const removeDownloadedMediaItem = useAppStore((state) => state.removeDownloadedMediaItem);
 
   const [item, setItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -107,7 +111,6 @@ export default function MediaDetailScreen() {
 
   const isVideo = item?.mime_type.startsWith('video/') ?? false;
   const downloadedRecord = item ? downloadedItems[item.id] : undefined;
-  const activeDl = item ? activeDownloads[item.id] : undefined;
 
   const streamUrl = useMemo(() => {
     if (!item) return '';
@@ -126,9 +129,7 @@ export default function MediaDetailScreen() {
     return null;
   }, [downloadedRecord?.localUri, syncStatus, streamUrl]);
 
-  const player = useVideoPlayer(isVideo && playUri ? playUri : null, (p) => {
-    p.loop = false;
-  });
+  const player = useAsyncVideoPlayer(isFocused && isVideo && playUri ? playUri : null, false);
 
   const parsedMetadata: ParsedMediaMetadata = useMemo(() => {
     if (!item?.metadata_json) return {};

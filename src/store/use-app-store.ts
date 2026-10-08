@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { observeBackgroundDownloads } from "@/services/background-downloader";
 import {
   Album,
   LibraryStats,
@@ -188,6 +189,27 @@ export const useAppStore = create<AppState>((set, get) => ({
         themeMode: themeConfig.mode,
         playAsShorts,
       });
+
+      observeBackgroundDownloads(
+        (progress) => {
+          const previous = get().activeDownloads[progress.mediaId];
+          if (previous?.totalBytesWritten === progress.totalBytesWritten &&
+              previous?.totalBytesExpectedToWrite === progress.totalBytesExpectedToWrite) return;
+          set((state) => ({ activeDownloads: {
+            ...state.activeDownloads, [progress.mediaId]: progress,
+          } }));
+        },
+        (mediaId, result) => set((state) => {
+          const activeDownloads = { ...state.activeDownloads };
+          delete activeDownloads[mediaId];
+          return {
+            activeDownloads,
+            ...(result.record ? { downloadedItems: {
+              ...state.downloadedItems, [mediaId]: result.record,
+            } } : {}),
+          };
+        }),
+      );
 
       await Promise.all([
         get().refreshLibrary(),
@@ -380,6 +402,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   startDownloadMediaItem: async (item: MediaItem) => {
+    if (get().downloadedItems[item.id]) return { success: true };
+    if (get().activeDownloads[item.id]) {
+      return { success: false, error: "This file is already downloading" };
+    }
     const { ip, port } = get();
 
     set((state) => ({

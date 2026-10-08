@@ -24,7 +24,7 @@ Comprehensive architectural and implementation guides are available in the [`doc
 - ⚡ **Local-First SQLite Database**: Fast offline browsing of large photo and video catalogs with dynamic filtering, full-text search, and multi-field sorting.
 - 🔄 **Atomic LAN Snapshot Sync**: Download full binary database snapshots from your desktop server with zero-downtime hot swapping.
 - 📱 **Adaptive Media Playback**: Native video streaming via `expo-video` and high-res photo viewing via `expo-image`, seamlessly falling back to downloaded offline files when not on your home Wi-Fi.
-- 📥 **Background Resumable Downloads**: Download media directly to device storage with live toast progress bars and automatic thumbnail caching for offline grids.
+- 📥 **Background Downloads**: Android system downloads with progress notifications and recovery after app relaunch; Expo/iOS background sessions with throttled UI updates, local notifications, and offline thumbnail caching.
 - 🎨 **Material Design 3 Theming**: Expressive M3 components with dynamic light and dark modes, rounded active tab pills, and responsive layouts.
 - 🚀 **Smooth 60 FPS Lists**: Virtualized gallery grids and lists powered by `@legendapp/list`.
 
@@ -61,6 +61,8 @@ npx expo start
 - **Android**: `npm run android`
 - **iOS**: `npm run ios`
 - **Web**: `npm run web`
+
+Android background downloads require a native build: run `npx expo run:android` or build with EAS after installing dependencies. Expo Go uses the Expo downloader fallback. Native builds must also be rebuilt when the notification plugin changes.
 
 ---
 

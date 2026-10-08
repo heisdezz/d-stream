@@ -22,6 +22,7 @@
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.7",
     "expo-network": "~57.0.2",
+    "expo-notifications": "57.0.13",
     "expo-router": "~57.0.15",
     "expo-splash-screen": "~57.0.7",
     "expo-sqlite": "^57.0.1",
@@ -57,7 +58,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "tsgo": "tsgo",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "test:downloads": "node scripts/downloads.test.cjs"
   },
   "private": true
 }
