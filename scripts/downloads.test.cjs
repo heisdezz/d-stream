@@ -57,7 +57,7 @@ function backgroundHarness(jobs = []) {
   });
   service.observeBackgroundDownloads((value) => progress.push(value), (id, result) => finished.push({ id, ...result }));
   return {
-    service, jobs, events, progress, finished,
+    service, native, jobs, events, progress, finished,
     failSave(value) { failSave = value; },
     async tick() { const pending = [...timers]; timers.clear(); pending.forEach((fn) => fn()); await settle(); },
     async state(value) { appState.currentState = value; appStateListener(value); await settle(); },
@@ -128,6 +128,49 @@ test('new native downloads resolve to the completed offline record', async () =>
   assert.equal(result.success, true);
   assert.equal(result.record.mediaId, 7);
   assert.equal(result.localUri, 'file:///downloads/1.mp4');
+});
+
+test('polls newly enqueued jobs even when an empty query is already in flight', async () => {
+  const harness = backgroundHarness();
+  await settle();
+  const query = harness.native.getJobs;
+  let release;
+  harness.native.getJobs = () => new Promise((resolve) => { release = resolve; });
+  await harness.state('active');
+  const pending = harness.service.downloadInBackground('http://lan/media/7', 'Test/7.mp4', record(7));
+  await settle();
+  harness.native.getJobs = query;
+  release([]);
+  await settle();
+  harness.jobs[0].status = 8;
+  harness.jobs[0].written = 100;
+  harness.jobs[0].total = 100;
+  await harness.tick();
+  assert.equal((await pending).success, true);
+});
+
+test('reports the native connection error instead of leaving the job active', async () => {
+  const harness = backgroundHarness([{ id: '41', recordJson: JSON.stringify(record(7)),
+    status: 16, reason: 0, error: 'Connection timed out' }]);
+  await settle();
+  assert.equal(harness.finished[0].error, 'Connection timed out');
+  assert.equal(harness.jobs.length, 0);
+});
+
+test('resolves a fast transfer completed before enqueue returns its ID', async () => {
+  const harness = backgroundHarness();
+  await settle();
+  let release;
+  harness.native.enqueue = () => {
+    harness.jobs.push({ id: 'fast', recordJson: JSON.stringify(record(7)), status: 8, written: 100, total: 100 });
+    return new Promise((resolve) => { release = resolve; });
+  };
+  const pending = harness.service.downloadInBackground('http://lan/media/7', 'Test/7.mp4', record(7));
+  await settle();
+  await harness.state('active');
+  release('fast');
+  assert.equal((await pending).success, true);
+  assert.equal(harness.jobs.length, 0);
 });
 
 test('concurrent record saves serialize atomic writes and preserve both records', async () => {

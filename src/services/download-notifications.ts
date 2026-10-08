@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-// Used by the Expo/iOS transport. Android DownloadManager owns its own notifications.
+// Android's native service owns progress notifications; this prepares permission.
 let setup: Promise<typeof import("expo-notifications") | null> | undefined;
 
 function prepare() {
@@ -34,6 +34,10 @@ function prepare() {
     }
   })();
   return setup;
+}
+
+export async function prepareDownloadNotifications() {
+  await prepare();
 }
 
 export async function notifyDownload(

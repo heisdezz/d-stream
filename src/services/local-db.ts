@@ -22,6 +22,9 @@ function formatBytes(bytes: number): string {
 }
 
 export function getDatabasePath(dbName: string = activeDbName): string {
+  if (!/^media_library(?:_\d+)?\.db$/.test(dbName)) {
+    throw new Error('Expected a database filename, not a path or file URI.');
+  }
   const baseDir = FileSystem.documentDirectory ?? '';
   return `${baseDir}SQLite/${dbName}`;
 }
@@ -213,6 +216,7 @@ export async function getDatabaseFileInfo(): Promise<{
 }
 
 export async function importDownloadedSnapshot(newDbName: string): Promise<boolean> {
+  let newDb: SQLite.SQLiteDatabase | null = null;
   try {
     // 0. Let any in-flight getDatabase() open finish so we don't race the
     //    module-level activeDbConnection singleton with it.
@@ -223,6 +227,9 @@ export async function importDownloadedSnapshot(newDbName: string): Promise<boole
     // 1. Diagnostic: confirm the downloaded file is where expo-sqlite will look.
     const expectedPath = getDatabasePath(newDbName);
     const info = await FileSystem.getInfoAsync(expectedPath);
+    if (!info.exists || info.isDirectory || info.size === 0) {
+      throw new Error('Downloaded database snapshot is empty or missing.');
+    }
     console.log(
       `[LocalDB] Snapshot file check: exists=${info.exists} size=${
         info.exists ? (info as any).size : 0
@@ -232,7 +239,7 @@ export async function importDownloadedSnapshot(newDbName: string): Promise<boole
     // 2. Open the fresh new database file directly. Unique filename => no
     //    overwrite of a file another handle already has open. Pass the explicit
     //    directory so open resolves to the exact folder we downloaded into.
-    const newDb = await SQLite.openDatabaseAsync(newDbName, undefined, getSqliteDirectory());
+    newDb = await SQLite.openDatabaseAsync(newDbName, undefined, getSqliteDirectory());
     await ensureDatabaseSchema(newDb);
 
     const row = await newDb.getFirstAsync<{ count: number }>(
@@ -251,6 +258,7 @@ export async function importDownloadedSnapshot(newDbName: string): Promise<boole
         // Ignored
       }
     }
+    newDb = null; // Ownership has transferred to activeDbConnection.
 
     console.log(`[LocalDB] Imported snapshot '${newDbName}' successfully. Media items count: ${mediaCount}`);
 
@@ -259,6 +267,7 @@ export async function importDownloadedSnapshot(newDbName: string): Promise<boole
 
     return true;
   } catch (error) {
+    if (newDb) await newDb.closeAsync().catch(() => {});
     console.error('[LocalDB] Database import failed:', error);
     return false;
   }

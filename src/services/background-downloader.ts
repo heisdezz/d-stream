@@ -12,6 +12,7 @@ interface Job {
   reason: number;
   written: number;
   total: number;
+  error?: string;
 }
 
 type JobRecord = DownloadedItemRecord & { thumbnailUrl?: string };
@@ -29,10 +30,13 @@ export const hasBackgroundDownloader = !!native;
 
 type Result = { success: boolean; record?: DownloadedItemRecord; localUri?: string; error?: string };
 const waiters = new Map<string, (result: Result) => void>();
+const earlyResults = new Map<string, Result>();
+let pendingEnqueues = 0;
 let onProgress: ((progress: DownloadProgress) => void) | undefined;
 let onFinished: ((mediaId: number, result: Result) => void) | undefined;
 let started = false;
 let polling = false;
+let pollRequested = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 export function observeBackgroundDownloads(
@@ -51,7 +55,11 @@ export function observeBackgroundDownloads(
 }
 
 async function poll() {
-  if (!native || polling || AppState.currentState === "background") return;
+  if (!native || AppState.currentState === "background") return;
+  if (polling) {
+    pollRequested = true;
+    return;
+  }
   if (timer) clearTimeout(timer);
   polling = true;
   let needsPolling = false;
@@ -86,11 +94,13 @@ async function poll() {
           result = { success: true, record, localUri: record.localUri };
         }
       } else {
-        result = { success: false, error: `Background download failed (${job.reason})` };
+        result = { success: false, error: job.error || `Background download failed (${job.reason})` };
       }
       await native.forget(job.id, !result.success);
       onFinished?.(record.mediaId, result);
-      waiters.get(job.id)?.(result);
+      const waiter = waiters.get(job.id);
+      if (waiter) waiter(result);
+      else if (pendingEnqueues > 0) earlyResults.set(job.id, result);
       waiters.delete(job.id);
       if (result.success) toast.success(`Downloaded ${record.fileName}`);
       else toast.error(result.error || "Download failed");
@@ -101,9 +111,10 @@ async function poll() {
     needsPolling = true;
   } finally {
     polling = false;
-    if (needsPolling && isForeground()) {
+    if ((needsPolling || pollRequested) && isForeground()) {
       timer = setTimeout(() => void poll(), 1000);
     }
+    pollRequested = false;
   }
 }
 
@@ -117,12 +128,21 @@ export async function downloadInBackground(
   record: JobRecord,
 ): Promise<Result> {
   if (!native) throw new Error("Background download module is unavailable");
-  const id = await native.enqueue(url, path, JSON.stringify(record));
-  toast.info(`Downloading ${record.fileName} in the background`);
-  return new Promise((resolve) => {
-    waiters.set(id, resolve);
-    void poll();
-  });
+  pendingEnqueues++;
+  try {
+    const id = await native.enqueue(url, path, JSON.stringify(record));
+    const completed = earlyResults.get(id);
+    if (completed) return completed;
+    console.log("[Downloader] Background job queued:", { id, mediaId: record.mediaId });
+    toast.info(`Downloading ${record.fileName} in the background`);
+    return new Promise((resolve) => {
+      waiters.set(id, resolve);
+      void poll();
+    });
+  } finally {
+    pendingEnqueues--;
+    if (pendingEnqueues === 0) earlyResults.clear();
+  }
 }
 
 async function cacheThumbnail(mediaId: number, url?: string): Promise<string | undefined> {

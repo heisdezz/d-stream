@@ -267,7 +267,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       syncProgress: { bytesWritten: 0, contentLength: 1, percentage: 0 },
     });
 
-    const targetUri = getNewSnapshotDownloadPath().path;
+    const { path: targetUri, dbName } = getNewSnapshotDownloadPath();
     const downloadRes = await downloadDatabaseSnapshot(
       currentIp,
       currentPort,
@@ -291,7 +291,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set({ status: "migrating" });
-    const importSuccess = await importDownloadedSnapshot(downloadRes.uri);
+    const importSuccess = await importDownloadedSnapshot(dbName);
 
     if (!importSuccess) {
       set({

@@ -45,7 +45,7 @@ jobs:
       - name: 🔨 Build Debug APK
         run: |
           cd android
-          ./gradlew :app:assembleDebug \
+          ./gradlew :dstream-downloads:testDebugUnitTest :app:assembleDebug \
             -PreactNativeArchitectures="$ANDROID_ARCHITECTURES" \
             --build-cache \
             --parallel \

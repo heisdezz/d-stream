@@ -9,7 +9,7 @@ import {
 } from "@/services/storage";
 import { MediaItem } from "@/types/models";
 import { downloadInBackground, hasBackgroundDownloader } from "./background-downloader";
-import { notifyDownload } from "./download-notifications";
+import { notifyDownload, prepareDownloadNotifications } from "./download-notifications";
 
 export interface DownloadProgress {
   mediaId: number;
@@ -181,6 +181,7 @@ export async function downloadMediaItem(
     const fileName =
       sanitizeFolderName(item.current_relative_path.replace(/\\/g, "/").split("/").pop() || `media_${item.id}`);
     if (hasBackgroundDownloader) {
+      void prepareDownloadNotifications();
       const location = (await getSavedDownloadLocation()).split(/[\\/]/)
         .filter((part) => part && part !== "." && part !== "..")
         .map(sanitizeFolderName).join("/");

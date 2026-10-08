@@ -54,6 +54,7 @@ runs:
         bun run typecheck
         bun run test:downloads
         bun run test:discovery
+        bun run test:local-db
 
     # Generate a complete Android project before restoring any native folders.
     - name: Expo prebuild

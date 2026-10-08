@@ -60,7 +60,8 @@
     "tsgo": "tsgo",
     "typecheck": "tsgo --noEmit",
     "test:downloads": "node scripts/downloads.test.cjs",
-    "test:discovery": "node scripts/lan-discovery.test.cjs"
+    "test:discovery": "node scripts/lan-discovery.test.cjs",
+    "test:local-db": "node scripts/local-db.test.cjs"
   },
   "private": true
 }
