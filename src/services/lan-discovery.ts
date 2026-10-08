@@ -13,12 +13,12 @@ export interface DiscoveredServer {
 
 export interface ScanOptions {
   port?: number;
-  preferredSubnet?: string;
   knownIps?: string[];
   timeoutPerHostMs?: number;
   concurrency?: number;
   signal?: AbortSignal;
   onServerFound?: (server: DiscoveredServer) => void;
+  onSubnetResolved?: (subnet: string) => void;
   onProgress?: (scanned: number, total: number, currentIp: string) => void;
 }
 
@@ -31,10 +31,10 @@ export function getSubnetPrefix(ip: string): string | null {
   if (parts.length === 4) {
     const isNumeric = parts.every((p) => {
       const n = Number(p);
-      return !isNaN(n) && n >= 0 && n <= 255;
+      return /^\d{1,3}$/.test(p) && n >= 0 && n <= 255;
     });
     if (isNumeric) {
-      return `${parts[0]}.${parts[1]}.${parts[2]}`;
+      return parts.slice(0, 3).map(Number).join('.');
     }
   }
   return null;
@@ -46,7 +46,7 @@ export function getSubnetPrefix(ip: string): string | null {
 export async function getDeviceIpAddress(): Promise<string | null> {
   try {
     const ip = await Network.getIpAddressAsync();
-    if (ip && ip !== '0.0.0.0' && !ip.startsWith('127.')) {
+    if (ip && getSubnetPrefix(ip) && ip !== '0.0.0.0' && !ip.startsWith('127.')) {
       return ip;
     }
   } catch (err) {
@@ -85,11 +85,6 @@ export async function probeServer(
       },
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutTimer);
-    if (externalSignal) {
-      externalSignal.removeEventListener('abort', onExternalAbort);
-    }
 
     if (!response.ok) {
       return null;
@@ -143,39 +138,27 @@ export async function scanLocalNetwork(
   const concurrency = options.concurrency ?? 24;
 
   const deviceIp = await getDeviceIpAddress();
-  let subnet = options.preferredSubnet
-    ? getSubnetPrefix(options.preferredSubnet)
-    : null;
-
-  if (!subnet && deviceIp) {
-    subnet = getSubnetPrefix(deviceIp);
-  }
-
-  // Fallbacks if device IP or subnet is indeterminate
+  if (options.signal?.aborted) return { servers: [], scannedSubnet: '' };
+  const subnet = deviceIp ? getSubnetPrefix(deviceIp) : null;
   if (!subnet) {
-    subnet = '192.168.1';
+    throw new Error('Could not detect your local network. Connect to Wi-Fi and try again.');
   }
+  options.onSubnetResolved?.(subnet);
 
   const priorityIps: string[] = [];
 
-  // 1. Add known / previously connected IPs if they match this subnet or are valid
+  // Saved addresses only affect scan order, never the network being scanned.
   if (options.knownIps) {
     for (const known of options.knownIps) {
-      if (known && !priorityIps.includes(known)) {
+      if (getSubnetPrefix(known) === subnet && !priorityIps.includes(known)) {
         priorityIps.push(known);
       }
     }
   }
 
-  // 2. Add device IP and emulator loopbacks
+  // 2. Add device IP. The full sweep includes the Android emulator host (10.0.2.2).
   if (deviceIp && !priorityIps.includes(deviceIp)) {
     priorityIps.push(deviceIp);
-  }
-  if (!priorityIps.includes('10.0.2.2')) {
-    priorityIps.push('10.0.2.2'); // Android emulator host
-  }
-  if (!priorityIps.includes('127.0.0.1')) {
-    priorityIps.push('127.0.0.1'); // Local loopback
   }
 
   // 3. Add common router/server gateway IPs
@@ -213,7 +196,7 @@ export async function scanLocalNetwork(
       scannedCount++;
       options.onProgress?.(scannedCount, allIps.length, ip);
 
-      if (res && !foundIpMap.has(res.ip)) {
+      if (res && !options.signal?.aborted && !foundIpMap.has(res.ip)) {
         foundIpMap.add(res.ip);
         discoveredServers.push(res);
         options.onServerFound?.(res);

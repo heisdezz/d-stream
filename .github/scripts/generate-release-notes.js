@@ -74,6 +74,7 @@ lines.forEach((line) => {
 
 // Construct release notes markdown
 let output = `## 📱 d-stream Android Release v${version} (Build #${runNumber})\n\n`;
+output += `**Android architectures:** ${process.env.ANDROID_ARCHITECTURES || "universal"}\n\n`;
 output += `**Full Commit:** [\`${commitSha.slice(0, 7)}\`](https://github.com/${repo}/commit/${commitSha})\n\n`;
 
 let hasEntries = false;

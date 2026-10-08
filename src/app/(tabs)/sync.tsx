@@ -214,7 +214,7 @@ export default function SyncScreen() {
 
       {/* LAN Server Discovery Scanner */}
       <LanServerScanner
-        currentIp={inputIp}
+        currentIp={ip}
         currentPort={parseInt(inputPort, 10) || 8080}
         knownIps={serverHistory.map((s) => s.ip)}
         isManualOpen={showManualConfig}

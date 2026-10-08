@@ -17,8 +17,6 @@ import { M3Button } from '@/components/material/m3-button';
 import {
   scanLocalNetwork,
   DiscoveredServer,
-  getDeviceIpAddress,
-  getSubnetPrefix,
 } from '@/services/lan-discovery';
 import { toast } from 'sonner-native';
 
@@ -97,20 +95,20 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
     setHasScanned(true);
     setDiscoveredServers([]);
     setScannedCount(0);
-
-    const deviceIp = await getDeviceIpAddress();
-    const guessedSubnet = deviceIp
-      ? getSubnetPrefix(deviceIp)
-      : getSubnetPrefix(currentIp) || '192.168.1';
-    setActiveSubnet(guessedSubnet || '192.168.1');
+    setTotalCount(254);
+    setActiveSubnet('');
 
     try {
       const result = await scanLocalNetwork({
         port: currentPort || 8080,
-        preferredSubnet: currentIp,
         knownIps,
         signal: controller.signal,
+        onSubnetResolved: (subnet) => {
+          if (controller.signal.aborted) return;
+          setActiveSubnet(subnet);
+        },
         onServerFound: (server) => {
+          if (controller.signal.aborted) return;
           setDiscoveredServers((prev) => {
             if (prev.some((s) => s.ip === server.ip && s.port === server.port)) {
               return prev;
@@ -120,14 +118,14 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
           toast.success(`Discovered ${server.serverName} at ${server.ip}!`);
         },
         onProgress: (scanned, total) => {
+          if (controller.signal.aborted) return;
           setScannedCount(scanned);
           setTotalCount(total);
         },
       });
 
-      setActiveSubnet(result.scannedSubnet);
-
       if (!controller.signal.aborted) {
+        setActiveSubnet(result.scannedSubnet);
         if (result.servers.length === 0) {
           toast.info('No servers discovered on local subnet. You can input IP manually.');
           onToggleManual(true);
@@ -137,13 +135,15 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
       }
     } catch (err: any) {
       if (!controller.signal.aborted) {
-        toast.error('Network scan encountered an error.');
+        toast.error(err?.message || 'Network scan encountered an error.');
       }
     } finally {
-      setIsScanning(false);
-      abortControllerRef.current = null;
+      if (abortControllerRef.current === controller) {
+        setIsScanning(false);
+        abortControllerRef.current = null;
+      }
     }
-  }, [isScanning, currentPort, currentIp, knownIps, onToggleManual]);
+  }, [isScanning, currentPort, knownIps, onToggleManual]);
 
   const handleStopScan = useCallback(() => {
     if (abortControllerRef.current) {
@@ -185,7 +185,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
             </Text>
             <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
               {isScanning
-                ? `Scanning ${activeSubnet}.* on port ${currentPort || 8080}...`
+                ? activeSubnet ? `Scanning ${activeSubnet}.* on port ${currentPort || 8080}...` : 'Detecting your local network...'
                 : hasScanned && discoveredServers.length > 0
                 ? `${discoveredServers.length} server(s) available on local network`
                 : 'Auto-detect desktop sync servers on your Wi-Fi'}
@@ -404,7 +404,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
             color={colors.outline}
           />
           <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-            No Servers Discovered on {activeSubnet}.*
+            {activeSubnet ? `No Servers Discovered on ${activeSubnet}.*` : 'No Local Network Detected'}
           </Text>
           <Text
             style={[

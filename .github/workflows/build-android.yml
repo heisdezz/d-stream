@@ -3,9 +3,26 @@ name: Android Release Build
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
   workflow_dispatch:
+    inputs:
+      architectures:
+        description: 'Target devices (ARM64 is fastest; universal supports all ABIs)'
+        type: choice
+        default: arm64-v8a
+        options:
+          - arm64-v8a
+          - arm64-v8a,x86_64
+          - armeabi-v7a,arm64-v8a,x86,x86_64
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,71 +34,21 @@ permissions:
 jobs:
   build:
     name: Build Android Release APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      ANDROID_ARCHITECTURES: ${{ inputs.architectures || 'arm64-v8a' }}
 
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: ${{ github.event_name == 'pull_request' && 1 || 0 }}
 
-      - name: ⚡ Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Prepare Android build
+        uses: ./.github/actions/setup-android-build
         with:
-          bun-version: latest
-
-      - name: ☕ Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      - name: 🤖 Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      # Cache the resolved Bun store + node_modules so `bun install` is a no-op
-      # when the lockfile is unchanged.
-      - name: 💾 Cache Bun Dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
-
-      - name: 📦 Install Dependencies
-        run: bun install --frozen-lockfile
-
-      - name: 🔍 TypeScript Verification
-        run: bun run typecheck
-
-      # Cache the native build intermediates (CMake/.cxx + the project Gradle
-      # dir). This is where most of the 20 min goes: recompiling RN, reanimated
-      # and the Expo modules' C++. Keyed on the inputs that change the native
-      # graph, so a JS-only change reuses the compiled objects.
-      - name: 💾 Cache Native Build Intermediates
-        uses: actions/cache@v4
-        with:
-          path: |
-            android/app/.cxx
-            android/.gradle
-          key: ${{ runner.os }}-rn-native-${{ hashFiles('bun.lock', 'app.json', 'package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-rn-native-
-
-      # NOTE: no --clean. --clean deletes android/ (including the restored .cxx),
-      # forcing a full native recompile every run. Prebuild is idempotent, and
-      # the native cache key already busts on app.json/package.json changes.
-      - name: 🏗️ Expo Prebuild (Generate Native Android Project)
-        run: bunx expo prebuild --platform android --no-install
-
-      - name: ⚙️ Enable Gradle Build Cache
-        # Leading newline: the generated gradle.properties has no trailing
-        # newline, so a bare `echo >>` would merge onto the last property line
-        # and corrupt it (breaking Expo autolinking's node step).
-        run: printf '\norg.gradle.caching=true\n' >> android/gradle.properties
+          variant: release
+          architectures: ${{ env.ANDROID_ARCHITECTURES }}
 
       - name: 🔑 Auto-Generate Release Signing Keystore
         run: |
@@ -96,21 +63,18 @@ jobs:
             -keypass dstreampass123 \
             -dname "CN=DStream, OU=Mobile, O=DStream, L=Unknown, ST=Unknown, C=US"
 
-      - name: 🐘 Setup Gradle with Cache
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: wrapper
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-
       - name: 🔨 Build Release APK
         run: |
           cd android
-          ./gradlew assembleRelease \
+          ./gradlew :app:assembleRelease \
+            -PreactNativeArchitectures="$ANDROID_ARCHITECTURES" \
             -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/android/app/release.keystore" \
             -Pandroid.injected.signing.store.password=dstreampass123 \
             -Pandroid.injected.signing.key.alias=dstream \
             -Pandroid.injected.signing.key.password=dstreampass123 \
             --build-cache \
+            --parallel \
+            --max-workers=2 \
             --no-daemon \
             --stacktrace
 
@@ -133,11 +97,14 @@ jobs:
           path: build-output/d-stream-release.apk
           if-no-files-found: error
           retention-days: 14
+          compression-level: 0
 
       - name: 📝 Generate Structured Release Notes
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         run: bun .github/scripts/generate-release-notes.js
 
       - name: 🏷️ Determine Release Tag & Version
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         id: release_meta
         run: |
           VERSION=$(bun -e "console.log(require('./package.json').version)")

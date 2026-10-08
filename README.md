@@ -64,6 +64,8 @@ npx expo start
 
 Android background downloads require a native build: run `npx expo run:android` or build with EAS after installing dependencies. Expo Go uses the Expo downloader fallback. Native builds must also be rebuilt when the notification plugin changes.
 
+GitHub Actions builds ARM64 APKs by default to reduce native compilation time. For emulators or broader device support, run the Android workflow manually and select `arm64-v8a,x86_64` or the universal `armeabi-v7a,arm64-v8a,x86,x86_64` option. The debug workflow also offers `x86_64` alone. Both workflows cache native C++ outputs and compiler results; release builds skip documentation-only pushes and pull requests.
+
 ---
 
 ## 📁 Project Structure

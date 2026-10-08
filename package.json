@@ -59,7 +59,8 @@
     "lint": "expo lint",
     "tsgo": "tsgo",
     "typecheck": "tsgo --noEmit",
-    "test:downloads": "node scripts/downloads.test.cjs"
+    "test:downloads": "node scripts/downloads.test.cjs",
+    "test:discovery": "node scripts/lan-discovery.test.cjs"
   },
   "private": true
 }
