@@ -216,7 +216,7 @@ export default function SyncScreen() {
       <LanServerScanner
         currentIp={ip}
         currentPort={parseInt(inputPort, 10) || 8080}
-        knownIps={serverHistory.map((s) => s.ip)}
+        knownServers={serverHistory.map((s) => ({ ip: s.ip, port: s.port }))}
         isManualOpen={showManualConfig}
         onSelectServer={handleSelectDiscoveredServer}
         onToggleManual={(open) => setShowManualConfig(open)}

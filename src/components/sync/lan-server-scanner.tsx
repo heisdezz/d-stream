@@ -23,7 +23,7 @@ import { toast } from 'sonner-native';
 export interface LanServerScannerProps {
   currentIp: string;
   currentPort: number;
-  knownIps: string[];
+  knownServers: Array<{ ip: string; port: number }>;
   isManualOpen: boolean;
   onSelectServer: (server: DiscoveredServer) => void;
   onToggleManual: (showManual: boolean) => void;
@@ -32,7 +32,7 @@ export interface LanServerScannerProps {
 export const LanServerScanner: React.FC<LanServerScannerProps> = ({
   currentIp,
   currentPort,
-  knownIps,
+  knownServers,
   isManualOpen,
   onSelectServer,
   onToggleManual,
@@ -95,13 +95,13 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
     setHasScanned(true);
     setDiscoveredServers([]);
     setScannedCount(0);
-    setTotalCount(254);
+    setTotalCount(0);
     setActiveSubnet('');
 
     try {
       const result = await scanLocalNetwork({
         port: currentPort || 8080,
-        knownIps,
+        knownServers: [{ ip: currentIp, port: currentPort || 8080 }, ...knownServers],
         signal: controller.signal,
         onSubnetResolved: (subnet) => {
           if (controller.signal.aborted) return;
@@ -127,10 +127,10 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
       if (!controller.signal.aborted) {
         setActiveSubnet(result.scannedSubnet);
         if (result.servers.length === 0) {
-          toast.info('No servers discovered on local subnet. You can input IP manually.');
+          toast.info('No reachable servers found. You can enter a server address manually.');
           onToggleManual(true);
         } else {
-          toast.success(`Found ${result.servers.length} server(s) on ${result.scannedSubnet}.*`);
+          toast.success(`Found ${result.servers.length} reachable server(s)`);
         }
       }
     } catch (err: any) {
@@ -143,7 +143,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
         abortControllerRef.current = null;
       }
     }
-  }, [isScanning, currentPort, knownIps, onToggleManual]);
+  }, [isScanning, currentIp, currentPort, knownServers, onToggleManual]);
 
   const handleStopScan = useCallback(() => {
     if (abortControllerRef.current) {
@@ -185,10 +185,10 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
             </Text>
             <Text style={[styles.subtitle, { color: colors.onSurfaceVariant }]}>
               {isScanning
-                ? activeSubnet ? `Scanning ${activeSubnet}.* on port ${currentPort || 8080}...` : 'Detecting your local network...'
+                ? activeSubnet ? `Scanning ${activeSubnet}...` : 'Detecting connected networks...'
                 : hasScanned && discoveredServers.length > 0
                 ? `${discoveredServers.length} server(s) available on local network`
-                : 'Auto-detect desktop sync servers on your Wi-Fi'}
+                : 'Find desktop sync servers on connected networks'}
             </Text>
           </View>
         </View>
@@ -217,7 +217,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
         <View style={styles.progressContainer}>
           <View style={styles.progressMetaRow}>
             <Text style={[styles.progressText, { color: colors.primary }]}>
-              Scanning subnet ({scannedCount} of {totalCount} IPs)
+              Checking addresses ({scannedCount} of {totalCount})
             </Text>
             <Text style={[styles.progressPctText, { color: colors.primary }]}>
               {progressPct}%
@@ -404,7 +404,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
             color={colors.outline}
           />
           <Text style={[styles.emptyTitle, { color: colors.onSurface }]}>
-            {activeSubnet ? `No Servers Discovered on ${activeSubnet}.*` : 'No Local Network Detected'}
+            {activeSubnet ? 'No Reachable Servers Found' : 'No Active Network Detected'}
           </Text>
           <Text
             style={[
@@ -413,8 +413,7 @@ export const LanServerScanner: React.FC<LanServerScannerProps> = ({
             ]}
           >
             Ensure your desktop sync server is actively running on port{' '}
-            {currentPort || 8080} and that this phone is connected to the same
-            Wi-Fi network.
+            {currentPort || 8080} and is reachable from this phone.
           </Text>
           <M3Button
             label="Enter IP Manually"

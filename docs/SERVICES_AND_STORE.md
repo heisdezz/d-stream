@@ -196,6 +196,16 @@ Run `npm run test:downloads` and `npm run typecheck`. After prebuild, run `./gra
 
 ---
 
+### 2.5 Network Discovery (`lan-discovery.ts`)
+
+Android native builds use `DStreamNetwork` to enumerate all active IPv4 interfaces and their actual prefix lengths, including secondary Wi-Fi, cellular, Ethernet, and VPN interfaces. Discovery probes every host in these connected ranges, merges overlapping ranges, and checks saved server addresses with their saved ports even outside those ranges. It does not use an unsaved IP text field to choose the network. Expo Go, iOS, and older Android binaries fall back to Expo's Wi-Fi address and a /24 range; saved addresses are still checked if that lookup fails.
+
+Targets are generated lazily with a bounded worker pool. Each request has a deadline covering connection and JSON parsing; cancellation and timeout release workers even if a fetch ignores abort. Progress updates are throttled so large networks remain responsive. A host is listed only when `/api/info` identifies a D-Stream server. Arbitrary public Internet addresses cannot be enumerated from a phone's interfaces; remote public servers are checked through their saved addresses.
+
+Run `npm run test:discovery` and `npm run typecheck`. Network interface enumeration requires a new Android native build; restarting Metro alone does not add `DStreamNetwork`.
+
+---
+
 ## 3. Store Layer (`src/store/`)
 
 The application employs a hybrid state management architecture:
