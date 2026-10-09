@@ -61,7 +61,8 @@
     "typecheck": "tsgo --noEmit",
     "test:downloads": "node scripts/downloads.test.cjs",
     "test:discovery": "node scripts/lan-discovery.test.cjs",
-    "test:local-db": "node scripts/local-db.test.cjs"
+    "test:local-db": "node scripts/local-db.test.cjs",
+    "test:media-detail": "node scripts/media-detail.test.cjs"
   },
   "private": true
 }

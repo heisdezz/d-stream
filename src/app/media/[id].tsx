@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { VideoView } from 'expo-video';
 import { useAsyncVideoPlayer } from '@/hooks/use-async-video-player';
+import { useMediaPlaybackSource } from '@/hooks/use-media-playback-source';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useSetAtom } from 'jotai';
@@ -59,6 +60,7 @@ export default function MediaDetailScreen() {
     return () => setIsFocused(false);
   }, []));
   const { id } = useLocalSearchParams<{ id: string }>();
+  const itemId = id ? parseInt(id, 10) : NaN;
   const router = useRouter();
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
@@ -69,48 +71,49 @@ export default function MediaDetailScreen() {
   const port = useAppStore((state) => state.port);
   const syncStatus = useAppStore((state) => state.status);
   const downloadLocation = useAppStore((state) => state.downloadLocation);
-  const downloadedItems = useAppStore((state) => state.downloadedItems);
-  const activeDl = useAppStore((state) => state.activeDownloads[Number(id)]);
+  const downloadedRecord = useAppStore((state) => state.downloadedItems[itemId]);
+  const activeDl = useAppStore((state) => state.activeDownloads[itemId]);
   const startDownloadMediaItem = useAppStore((state) => state.startDownloadMediaItem);
   const removeDownloadedMediaItem = useAppStore((state) => state.removeDownloadedMediaItem);
 
-  const [item, setItem] = useState<MediaItem | null>(null);
+  const [catalogItem, setCatalogItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'details' | 'exif' | 'tags'>('details');
 
-  const itemId = id ? parseInt(id, 10) : NaN;
-
   useEffect(() => {
+    let cancelled = false;
     async function loadItem() {
-      if (isNaN(itemId)) return;
       setLoading(true);
-      let res = await getMediaItemById(itemId);
-      if (!res) {
-        const dlRecord = downloadedItems[itemId];
-        if (dlRecord) {
-          res = {
-            id: dlRecord.mediaId,
-            file_hash: '',
-            original_relative_path: dlRecord.fileName,
-            current_relative_path: dlRecord.fileName,
-            file_size: dlRecord.fileSize,
-            mime_type: dlRecord.mimeType,
-            duration_seconds: null,
-            metadata_json: null,
-            album_id: null,
-            album_name: dlRecord.albumName,
-            created_at: dlRecord.downloadedAt,
-          };
-        }
+      try {
+        const res = Number.isNaN(itemId) ? null : await getMediaItemById(itemId);
+        if (!cancelled) setCatalogItem(res);
+      } catch (error) {
+        console.warn('[MediaDetail] Could not load media item:', error);
+        if (!cancelled) setCatalogItem(null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setItem(res);
-      setLoading(false);
     }
     loadItem();
-  }, [itemId, downloadedItems]);
+    return () => { cancelled = true; };
+  }, [itemId]);
+
+  // Offline-only items don't require another catalog query when their record updates.
+  const item = useMemo<MediaItem | null>(() => catalogItem || (downloadedRecord ? {
+    id: downloadedRecord.mediaId,
+    file_hash: '',
+    original_relative_path: downloadedRecord.fileName,
+    current_relative_path: downloadedRecord.fileName,
+    file_size: downloadedRecord.fileSize,
+    mime_type: downloadedRecord.mimeType,
+    duration_seconds: null,
+    metadata_json: null,
+    album_id: null,
+    album_name: downloadedRecord.albumName,
+    created_at: downloadedRecord.downloadedAt,
+  } : null), [catalogItem, downloadedRecord]);
 
   const isVideo = item?.mime_type.startsWith('video/') ?? false;
-  const downloadedRecord = item ? downloadedItems[item.id] : undefined;
 
   const streamUrl = useMemo(() => {
     if (!item) return '';
@@ -122,12 +125,11 @@ export default function MediaDetailScreen() {
     return getThumbnailUrl(ip, port, item.id);
   }, [ip, port, item]);
 
-  // Use downloaded local URI if offline or available!
-  const playUri = useMemo(() => {
-    if (downloadedRecord?.localUri) return downloadedRecord.localUri;
-    if (syncStatus === 'connected' && streamUrl) return streamUrl;
-    return null;
-  }, [downloadedRecord?.localUri, syncStatus, streamUrl]);
+  const playUri = useMediaPlaybackSource(
+    itemId,
+    downloadedRecord?.localUri,
+    syncStatus === 'connected' && streamUrl ? streamUrl : null,
+  );
 
   const player = useAsyncVideoPlayer(isFocused && isVideo && playUri ? playUri : null, false);
 
