@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
+import { DebouncedSearchBar } from '@/components/common/debounced-search-bar';
 import { Spacing } from '@/constants/theme';
 import type { Album } from '@/types/models';
 
@@ -22,6 +23,13 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
   const insets = useSafeAreaInsets();
   const [albumId, setAlbumId] = useState<number | null>(null);
   const [deleteAfterUpload, setDeleteAfterUpload] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    if (!visible) setSearchQuery('');
+  }, [visible]);
+  const filteredAlbums = albums.filter((album) =>
+    album.name.toLocaleLowerCase().includes(searchQuery.trim().toLocaleLowerCase()),
+  );
 
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy ? undefined : onClose}>
     <View style={styles.backdrop}>
@@ -37,11 +45,19 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
           </Pressable>
         </View>
         {!connected && !busy ? <Text style={[styles.notice, { color: colors.error }]}>Connect to the desktop server before uploading.</Text> : null}
-        {albums.length === 0 ? <Text style={[styles.notice, { color: colors.onSurfaceVariant }]}>Sync your library to choose an album.</Text> :
+        {albums.length === 0 ? <Text style={[styles.notice, { color: colors.onSurfaceVariant }]}>Sync your library to choose an album.</Text> : <>
+          {visible && <DebouncedSearchBar
+            value={searchQuery}
+            onSearch={setSearchQuery}
+            placeholder="Search albums..."
+            style={styles.searchBar}
+          />}
           <FlatList
-            data={albums}
+            data={filteredAlbums}
             keyExtractor={(album) => String(album.id)}
             style={styles.albumList}
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={<Text style={[styles.notice, { color: colors.onSurfaceVariant }]}>No albums match your search.</Text>}
             renderItem={({ item }) => <Pressable
               accessibilityRole="radio"
               accessibilityState={{ selected: albumId === item.id }}
@@ -54,7 +70,8 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
               <Text numberOfLines={1} style={[styles.albumName, { color: colors.onSurface }]}>{item.name}</Text>
               {albumId === item.id && <MaterialIcons name="check-circle" size={22} color={colors.primary} />}
             </Pressable>}
-          />}
+          />
+        </>}
         <View style={styles.deleteRow}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.deleteTitle, { color: colors.onSurface }]}>Delete originals after upload</Text>
@@ -83,6 +100,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
   close: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   notice: { fontSize: 14, marginBottom: Spacing.two },
+  searchBar: { marginBottom: Spacing.two },
   albumList: { flexGrow: 0, maxHeight: 280 },
   albumRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.two, borderRadius: 12 },
   albumName: { flex: 1, fontSize: 15 },
