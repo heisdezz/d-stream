@@ -36,6 +36,7 @@ interface AppStorageData {
   themeAccent: string;
   themeMode: ThemeMode;
   playAsShorts: boolean;
+  writeKeys: Record<string, string>;
 }
 
 const defaultData: AppStorageData = {
@@ -50,6 +51,7 @@ const defaultData: AppStorageData = {
   themeAccent: "system",
   themeMode: "system",
   playAsShorts: false,
+  writeKeys: {},
 };
 
 let memoryCache: AppStorageData = { ...defaultData };
@@ -113,6 +115,17 @@ export async function getSavedServerConfig(): Promise<{
 }> {
   const data = await loadDataFromDisk();
   return { ip: data.serverIp, port: data.serverPort };
+}
+
+export async function getSavedWriteKey(ip: string, port: number): Promise<string> {
+  const data = await loadDataFromDisk();
+  return data.writeKeys?.[`${ip.trim()}:${port}`] || '';
+}
+
+export async function saveWriteKey(ip: string, port: number, key: string): Promise<void> {
+  const data = await loadDataFromDisk();
+  data.writeKeys = { ...data.writeKeys, [`${ip.trim()}:${port}`]: key.trim() };
+  await saveDataToDisk(true);
 }
 
 export async function saveServerConfig(

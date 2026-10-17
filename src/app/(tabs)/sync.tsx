@@ -21,6 +21,8 @@ import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
 import {
   PAGE_SIZE_OPTIONS,
   DEFAULT_DOWNLOAD_LOCATION,
+  getSavedWriteKey,
+  saveWriteKey,
 } from "@/services/storage";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
@@ -89,6 +91,7 @@ export default function SyncScreen() {
   const [inputPort, setInputPort] = useState<string>(port.toString());
   const [inputDlLocation, setInputDlLocation] =
     useState<string>(downloadLocation);
+  const [inputWriteKey, setInputWriteKey] = useState('');
   const [showManualConfig, setShowManualConfig] = useState<boolean>(
     !serverHistory.length,
   );
@@ -101,6 +104,26 @@ export default function SyncScreen() {
   useEffect(() => {
     setInputDlLocation(downloadLocation);
   }, [downloadLocation]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSavedWriteKey(ip, port).then((key) => { if (!cancelled) setInputWriteKey(key); });
+    return () => { cancelled = true; };
+  }, [ip, port]);
+
+  const handleSaveWriteKey = async () => {
+    const token = inputWriteKey.trim();
+    if (token && !/^[a-f0-9]{64}$/i.test(token)) {
+      toast.error('The desktop write token must be 64 hexadecimal characters.');
+      return;
+    }
+    try {
+      await saveWriteKey(ip, port, token);
+      toast.success(token ? 'Write token saved for this server.' : 'Write token removed.');
+    } catch (error) {
+      toast.error('Could not save the write token.');
+    }
+  };
 
   const handleApplyAndTest = async () => {
     const p = parseInt(inputPort, 10) || 8080;
@@ -577,6 +600,28 @@ export default function SyncScreen() {
             thumbColor={playAsShorts ? colors.onPrimary : colors.outline}
           />
         </View>
+      </M3Card>
+
+      {/* Server writes require the key shown in the desktop app's sync settings. */}
+      <M3Card variant="elevated" style={tw`p-4 mb-4`}>
+        <View style={tw`flex-row items-center mb-2`}>
+          <MaterialIcons name="vpn-key" size={20} color={colors.primary} />
+          <Text style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}>Library write token</Text>
+        </View>
+        <Text style={[tw`text-xs mb-3`, { color: colors.onSurfaceVariant }]}>
+          Copy the write token from Local Network Mobile Sync in the desktop Settings. It changes when that server restarts.
+        </Text>
+        <TextInput
+          value={inputWriteKey}
+          onChangeText={setInputWriteKey}
+          placeholder="Desktop server write token"
+          placeholderTextColor={colors.outline}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={[tw`h-12 rounded-xl border px-3 text-sm mb-3`, { backgroundColor: colors.surfaceContainerHighest, borderColor: colors.outlineVariant, color: colors.onSurface }]}
+        />
+        <M3Button label="Save token" icon="check" variant="tonal" onPress={() => void handleSaveWriteKey()} />
       </M3Card>
 
       {/* Download Storage Location Card */}

@@ -7,7 +7,7 @@ import {
   Pressable,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { Href, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAtom } from "jotai";
 import { LegendList, LegendListRef } from "@legendapp/list/react-native";
@@ -205,6 +205,17 @@ export default function MediaExplorerScreen() {
           placeholder="Search media by filename or path..."
           style={{ flex: 1, marginRight: Spacing.two }}
         />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Browse media on this device"
+          onPress={() => router.push('/on-device' as Href)}
+          style={({ pressed }) => [
+            styles.layoutToggleBtn,
+            { backgroundColor: colors.surfaceContainerHigh, borderColor: colors.outlineVariant, marginRight: Spacing.one, opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <MaterialIcons name="phone-android" size={22} color={colors.onSurface} />
+        </Pressable>
         <Pressable
           onPress={toggleLayoutMode}
           style={({ pressed }) => [

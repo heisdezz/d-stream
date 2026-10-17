@@ -11,6 +11,7 @@ import { getThumbnailUrl } from '@/services/sync-api';
 export interface AlbumCardProps {
   album: Album;
   onPress: (album: Album) => void;
+  onManage?: (album: Album) => void;
   width?: number;
   serverIp?: string;
   serverPort?: number;
@@ -19,6 +20,7 @@ export interface AlbumCardProps {
 export const AlbumCard = React.memo(function AlbumCard({
   album,
   onPress,
+  onManage,
   width,
   serverIp,
   serverPort = 8080,
@@ -114,13 +116,25 @@ export const AlbumCard = React.memo(function AlbumCard({
           )}
         </View>
 
-        <MaterialIcons name="chevron-right" size={24} color={colors.outline} />
+        {onManage ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Manage ${album.name}`}
+            onPress={(event) => { event.stopPropagation(); onManage(album); }}
+            style={styles.manageButton}
+          >
+            <MaterialIcons name="more-vert" size={24} color={colors.onSurfaceVariant} />
+          </Pressable>
+        ) : (
+          <MaterialIcons name="chevron-right" size={24} color={colors.outline} />
+        )}
       </View>
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
+  manageButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   card: {
     borderRadius: Shapes.large,
     padding: Spacing.two + 2,

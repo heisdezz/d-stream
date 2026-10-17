@@ -80,6 +80,10 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
+              name="on-device/index"
+              options={{ headerShown: true, title: 'On this device', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
               name="album/[id]"
               options={{
                 headerShown: true,

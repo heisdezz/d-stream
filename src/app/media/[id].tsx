@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   Platform,
   Alert,
+  Modal,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +25,7 @@ import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
 import { getMediaItemById } from '@/services/local-db';
 import { getMediaStreamUrl, getThumbnailUrl } from '@/services/sync-api';
+import { catalogError, deleteServerMedia, updateServerMedia } from '@/services/catalog-api';
 import { MediaItem, ParsedMediaMetadata } from '@/types/models';
 import { Spacing, Shapes, MaxContentWidth, Elevation } from '@/constants/theme';
 import { M3Card } from '@/components/material/m3-card';
@@ -70,6 +72,8 @@ export default function MediaDetailScreen() {
   const ip = useAppStore((state) => state.ip);
   const port = useAppStore((state) => state.port);
   const syncStatus = useAppStore((state) => state.status);
+  const albums = useAppStore((state) => state.albums);
+  const syncDatabase = useAppStore((state) => state.syncDatabase);
   const downloadLocation = useAppStore((state) => state.downloadLocation);
   const downloadedRecord = useAppStore((state) => state.downloadedItems[itemId]);
   const activeDl = useAppStore((state) => state.activeDownloads[itemId]);
@@ -79,6 +83,8 @@ export default function MediaDetailScreen() {
   const [catalogItem, setCatalogItem] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'details' | 'exif' | 'tags'>('details');
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [savingCatalog, setSavingCatalog] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +214,39 @@ export default function MediaDetailScreen() {
       router.dismiss();
       router.push(`/album/${item.album_id}`);
     }
+  };
+
+  const handleMoveToAlbum = async (targetAlbumId: number) => {
+    if (!item || savingCatalog) return;
+    setSavingCatalog(true);
+    try {
+      await updateServerMedia(ip, port, item.id, targetAlbumId);
+      const destination = albums.find((album) => album.id === targetAlbumId);
+      setCatalogItem({ ...item, album_id: targetAlbumId, album_name: destination?.name });
+      setShowMoveDialog(false);
+      const sync = await syncDatabase();
+      if (!sync.success) toast.info('Move saved on server. Sync the library to update other screens.');
+      else toast.success('Media moved.');
+    } catch (error) { toast.error(catalogError(error)); }
+    finally { setSavingCatalog(false); }
+  };
+
+  const handleDeleteFromLibrary = () => {
+    if (!item || savingCatalog) return;
+    Alert.alert('Delete from library?', `Delete ${item.current_relative_path.split('/').pop()} from the desktop library?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        setSavingCatalog(true);
+        try {
+          await deleteServerMedia(ip, port, item.id);
+          if (downloadedRecord) await removeDownloadedMediaItem(item.id);
+          router.back();
+          const sync = await syncDatabase();
+          if (!sync.success) toast.info('Deleted on server. Sync the library to update the catalog.');
+        } catch (error) { toast.error(catalogError(error)); }
+        finally { setSavingCatalog(false); }
+      } },
+    ]);
   };
 
   if (loading) {
@@ -457,6 +496,44 @@ export default function MediaDetailScreen() {
         </View>
       </M3Card>
 
+      {syncStatus === 'connected' && (
+        <View style={styles.catalogActions}>
+          <M3Button
+            label="Move to album"
+            icon="drive-file-move"
+            variant="tonal"
+            onPress={() => setShowMoveDialog(true)}
+            style={{ flex: 1, marginRight: Spacing.two }}
+          />
+          <M3Button label="Delete" icon="delete-outline" variant="outlined" onPress={handleDeleteFromLibrary} />
+        </View>
+      )}
+
+      <Modal visible={showMoveDialog} transparent animationType="fade" onRequestClose={() => setShowMoveDialog(false)}>
+        <View style={styles.moveBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowMoveDialog(false)} accessibilityLabel="Close album chooser" />
+          <View style={[styles.moveDialog, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.moveTitle, { color: colors.onSurface }]}>Move to album</Text>
+            <ScrollView>
+              {albums.map((album) => (
+                <Pressable
+                  key={album.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move to ${album.name}`}
+                  disabled={savingCatalog || album.id === item.album_id}
+                  onPress={() => void handleMoveToAlbum(album.id)}
+                  style={styles.moveOption}
+                >
+                  <MaterialIcons name="folder" size={20} color={colors.primary} />
+                  <Text numberOfLines={1} style={{ color: colors.onSurface, flex: 1 }}>{album.name}</Text>
+                  {album.id === item.album_id && <MaterialIcons name="check" size={20} color={colors.primary} />}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Detail Tabs */}
       <View style={styles.tabHeaderRow}>
         <Pressable
@@ -639,6 +716,11 @@ function DetailRow({ label, value, colors }: { label: string; value: string; col
 }
 
 const styles = StyleSheet.create({
+  catalogActions: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.three },
+  moveBackdrop: { flex: 1, backgroundColor: '#0008', justifyContent: 'center', padding: Spacing.four },
+  moveDialog: { padding: Spacing.four, borderRadius: Shapes.large, maxHeight: '70%' },
+  moveTitle: { fontSize: 18, fontWeight: '800', marginBottom: Spacing.two },
+  moveOption: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 48 },
   container: {
     flex: 1,
   },

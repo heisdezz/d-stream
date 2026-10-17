@@ -32,7 +32,7 @@ function harness() {
       }
     },
   };
-  const state = { ip: '10.27.147.205', port: 8080, status: 'connected', downloadedItems: {}, activeDownloads: {} };
+  const state = { ip: '10.27.147.205', port: 8080, status: 'connected', albums: [], downloadedItems: {}, activeDownloads: {} };
   const catalog = { id: 1, mime_type: 'video/mp4', current_relative_path: 'video.mp4', created_at: '', file_size: 100 };
   const load = (file, mocks) => {
     const exports = {};
@@ -58,6 +58,7 @@ function harness() {
     '@/store/use-app-store': { useAppStore: (selector) => selector(state) },
     '@/services/local-db': { getMediaItemById: async (id) => { queries++; return id === 1 ? catalog : null; } },
     '@/services/sync-api': { getMediaStreamUrl: (_ip, _port, id) => `http://server/${id}`, getThumbnailUrl: () => 'thumbnail' },
+    '@/services/catalog-api': {},
     jotai: { useSetAtom: () => () => {} },
     '@/constants/theme': { Spacing: {}, Shapes: {}, Elevation: {} },
   };

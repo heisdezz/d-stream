@@ -8,10 +8,14 @@ import {
   Pressable,
   FlatList,
   Platform,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSetAtom } from "jotai";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { useAppStore } from "@/store/use-app-store";
 import { selectedAlbumIdAtom, selectedTagIdAtom } from "@/store/atoms";
@@ -28,6 +32,8 @@ import { M3Badge } from "@/components/material/m3-badge";
 import { ScreenLoader } from "@/components/common/screen-loader";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Album, Tag } from "@/types/models";
+import { catalogError, createServerAlbum, deleteServerAlbum, updateServerAlbum } from "@/services/catalog-api";
+import { toast } from "sonner-native";
 import tw from "twrnc";
 
 type CollectionTab = "albums" | "tags";
@@ -41,6 +47,7 @@ export default function AlbumsScreen() {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [currentTab, setCurrentTab] = useState<CollectionTab>("albums");
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,7 +55,56 @@ export default function AlbumsScreen() {
   const setSelectedTagId = useSetAtom(selectedTagIdAtom);
   const setSelectedAlbumId = useSetAtom(selectedAlbumIdAtom);
 
-  const { ip, port, status: syncStatus, stats, hasDatabase } = useAppStore();
+  const { ip, port, status: syncStatus, stats, hasDatabase, syncDatabase } = useAppStore();
+  const [editingAlbum, setEditingAlbum] = useState<Album | null | undefined>(undefined);
+  const [albumName, setAlbumName] = useState("");
+  const [albumDescription, setAlbumDescription] = useState("");
+  const [savingAlbum, setSavingAlbum] = useState(false);
+
+  const openAlbumEditor = (album: Album | null) => {
+    if (syncStatus !== 'connected') {
+      toast.error('Connect to the desktop server to edit albums.');
+      return;
+    }
+    setEditingAlbum(album);
+    setAlbumName(album?.name || '');
+    setAlbumDescription(album?.description || '');
+  };
+
+  const refreshAfterEdit = async () => {
+    const result = await syncDatabase();
+    if (!result.success) toast.info('Change saved on server. Sync the library to see it here.');
+    await queryClient.invalidateQueries({ queryKey: ['albums'] });
+  };
+
+  const saveAlbum = async () => {
+    if (editingAlbum === undefined || savingAlbum) return;
+    if (!albumName.trim()) { toast.error('Enter an album name.'); return; }
+    setSavingAlbum(true);
+    try {
+      if (editingAlbum) await updateServerAlbum(ip, port, editingAlbum.id, albumName, albumDescription);
+      else await createServerAlbum(ip, port, albumName, albumDescription);
+      setEditingAlbum(undefined);
+      await refreshAfterEdit();
+      toast.success('Album saved.');
+    } catch (error) { toast.error(catalogError(error)); }
+    finally { setSavingAlbum(false); }
+  };
+
+  const deleteAlbum = (album: Album) => {
+    if (album.name === 'unknown') { toast.error('The default album cannot be deleted.'); return; }
+    Alert.alert('Delete album?', `Delete ${album.name}? Its ${album.media_count} media item${album.media_count === 1 ? '' : 's'} will move to Unsorted Media on the desktop.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          await deleteServerAlbum(ip, port, album.id);
+          setEditingAlbum(undefined);
+          await refreshAfterEdit();
+          toast.success('Album deleted.');
+        } catch (error) { toast.error(catalogError(error)); }
+      } },
+    ]);
+  };
 
   const {
     data: albumsData = [],
@@ -120,6 +176,7 @@ export default function AlbumsScreen() {
         serverIp={syncStatus === "connected" ? ip : undefined}
         serverPort={port}
         onPress={handleAlbumPress}
+        onManage={currentTab === 'albums' && syncStatus === 'connected' ? openAlbumEditor : undefined}
       />
     ),
     [syncStatus, ip, port, handleAlbumPress],
@@ -162,6 +219,12 @@ export default function AlbumsScreen() {
               : "Filter tags by category or name..."
           }
         />
+        {currentTab === 'albums' && syncStatus === 'connected' && (
+          <Pressable onPress={() => openAlbumEditor(null)} accessibilityRole="button" style={styles.createAlbumButton}>
+            <MaterialIcons name="create-new-folder" size={20} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: '700' }}>New album</Text>
+          </Pressable>
+        )}
       </View>
 
       {!isServerReady ? (
@@ -351,11 +414,47 @@ export default function AlbumsScreen() {
           </View>
         </>
       )}
+      <Modal visible={editingAlbum !== undefined} transparent animationType="fade" onRequestClose={() => setEditingAlbum(undefined)}>
+        <View style={styles.editorBackdrop}>
+          <View style={[styles.editorCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.editorTitle, { color: colors.onSurface }]}>{editingAlbum ? 'Edit album' : 'New album'}</Text>
+            <TextInput
+              value={albumName}
+              onChangeText={setAlbumName}
+              placeholder="Album name"
+              placeholderTextColor={colors.onSurfaceVariant}
+              style={[styles.editorInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+              maxLength={120}
+              autoFocus
+            />
+            <TextInput
+              value={albumDescription}
+              onChangeText={setAlbumDescription}
+              placeholder="Description (optional)"
+              placeholderTextColor={colors.onSurfaceVariant}
+              style={[styles.editorInput, { color: colors.onSurface, borderColor: colors.outlineVariant }]}
+              maxLength={500}
+            />
+            <View style={styles.editorActions}>
+              {editingAlbum && <Pressable onPress={() => deleteAlbum(editingAlbum)} style={styles.editorAction}><Text style={{ color: colors.error }}>Delete</Text></Pressable>}
+              <Pressable onPress={() => setEditingAlbum(undefined)} style={styles.editorAction}><Text style={{ color: colors.onSurfaceVariant }}>Cancel</Text></Pressable>
+              <Pressable onPress={() => void saveAlbum()} disabled={savingAlbum} style={styles.editorAction}><Text style={{ color: colors.primary, fontWeight: '700' }}>{savingAlbum ? 'Saving…' : 'Save'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  createAlbumButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  editorBackdrop: { flex: 1, backgroundColor: '#0008', justifyContent: 'center', padding: Spacing.four },
+  editorCard: { padding: Spacing.four, borderRadius: Shapes.large },
+  editorTitle: { fontSize: 19, fontWeight: '800', marginBottom: Spacing.three },
+  editorInput: { minHeight: 48, borderWidth: 1, borderRadius: Shapes.small, paddingHorizontal: Spacing.three, marginBottom: Spacing.two },
+  editorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.two, marginTop: Spacing.one },
+  editorAction: { minHeight: 48, paddingHorizontal: Spacing.two, justifyContent: 'center' },
   topBar: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,

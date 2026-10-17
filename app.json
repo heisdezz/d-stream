@@ -42,6 +42,13 @@
       "expo-font",
       "expo-sqlite",
       "expo-file-system",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow D-Stream to browse photos and videos you choose to upload.",
+          "granularPermissions": ["photo", "video"]
+        }
+      ],
       "expo-notifications",
       [
         "expo-splash-screen",
