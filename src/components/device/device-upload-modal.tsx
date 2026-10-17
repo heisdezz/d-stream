@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
@@ -33,7 +33,7 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
   );
 
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={busy ? undefined : onClose}>
-    <View style={styles.backdrop}>
+    <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Pressable style={StyleSheet.absoluteFill} onPress={busy ? undefined : onClose} accessibilityLabel="Close upload options" />
       <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + Spacing.three }]}>
         <View style={styles.heading}>
@@ -91,7 +91,7 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
           <Text style={[styles.uploadText, { color: colors.onPrimary }]}>{busy ? progress : 'Start upload'}</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   </Modal>;
 }
 
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   close: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   notice: { fontSize: 14, marginBottom: Spacing.two },
   searchBar: { marginBottom: Spacing.two },
-  albumList: { flexGrow: 0, maxHeight: 280 },
+  albumList: { flexGrow: 0, flexShrink: 1, maxHeight: 280 },
   albumRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingHorizontal: Spacing.two, borderRadius: 12 },
   albumName: { flex: 1, fontSize: 15 },
   deleteRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 72, marginTop: Spacing.three, marginBottom: Spacing.two },
