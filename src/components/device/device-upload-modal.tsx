@@ -14,11 +14,12 @@ interface Props {
   connected: boolean;
   busy: boolean;
   progress: string;
+  errorMessage: string;
   onClose: () => void;
   onUpload: (albumId: number, deleteAfterUpload: boolean) => void;
 }
 
-export function DeviceUploadModal({ visible, albums, count, connected, busy, progress, onClose, onUpload }: Props) {
+export function DeviceUploadModal({ visible, albums, count, connected, busy, progress, errorMessage, onClose, onUpload }: Props) {
   const { colors } = useMaterialTheme();
   const insets = useSafeAreaInsets();
   const [albumId, setAlbumId] = useState<number | null>(null);
@@ -45,6 +46,7 @@ export function DeviceUploadModal({ visible, albums, count, connected, busy, pro
           </Pressable>
         </View>
         {!connected && !busy ? <Text style={[styles.notice, { color: colors.error }]}>Connect to the desktop server before uploading.</Text> : null}
+        {!!errorMessage && <Text style={[styles.notice, { color: colors.error }]} accessibilityRole="alert">{errorMessage}</Text>}
         {albums.length === 0 ? <Text style={[styles.notice, { color: colors.onSurfaceVariant }]}>Sync your library to choose an album.</Text> : <>
           {visible && <DebouncedSearchBar
             value={searchQuery}

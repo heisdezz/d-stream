@@ -1,4 +1,5 @@
 import { requireOptionalNativeModule } from 'expo';
+import { Platform } from 'react-native';
 import type * as MediaLibrary from 'expo-media-library/legacy';
 
 // OTA JavaScript can reach an older APK before its new native module is installed.
@@ -50,7 +51,12 @@ export async function deleteDeviceMedia(id: string): Promise<boolean> {
   return requireMediaLibrary().deleteAssetsAsync(id);
 }
 
-export async function getDeviceMediaFileUri(asset: DeviceMedia): Promise<string> {
+export async function getDeviceMediaUploadUri(asset: DeviceMedia): Promise<string> {
+  if (Platform.OS === 'android') {
+    // MediaStore owns these files on recent Android versions. Use its readable
+    // content URI instead of attempting direct access to the external file path.
+    return requireMediaLibrary().getAssetContentUriAsync(asset);
+  }
   const info = await requireMediaLibrary().getAssetInfoAsync(asset, { shouldDownloadFromNetwork: true });
   const uri = info.localUri || info.uri;
   if (!uri?.startsWith('file://')) {

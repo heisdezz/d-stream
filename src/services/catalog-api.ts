@@ -1,8 +1,8 @@
 import axios from 'axios';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, UploadTask, UploadType } from 'expo-file-system';
 import type { Album, MediaItem } from '@/types/models';
 import type { DeviceMedia } from './device-media';
-import { getDeviceMediaFileUri } from './device-media';
+import { getDeviceMediaUploadUri } from './device-media';
 import { getServerBaseUrl } from './sync-api';
 import { getSavedWriteKey } from './storage';
 
@@ -56,17 +56,23 @@ export async function uploadDeviceMedia(
   asset: DeviceMedia,
   onProgress?: (fraction: number) => void,
 ): Promise<MediaItem> {
-  const fileUri = await getDeviceMediaFileUri(asset);
+  const headers = await writeHeaders(ip, port);
+  const fileUri = await getDeviceMediaUploadUri(asset);
   const url = `${getServerBaseUrl(ip, port)}/api/media?albumId=${albumId}&filename=${encodeURIComponent(asset.filename)}`;
-  const task = FileSystem.createUploadTask(url, fileUri, {
+  const task = new UploadTask(new File(fileUri), url, {
     httpMethod: 'POST',
-    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    headers: { ...(await writeHeaders(ip, port)), 'Content-Type': 'application/octet-stream' },
-  }, ({ totalBytesSent, totalBytesExpectedToSend }) => {
-    if (totalBytesExpectedToSend > 0) onProgress?.(totalBytesSent / totalBytesExpectedToSend);
+    uploadType: UploadType.BINARY_CONTENT,
+    headers: { ...headers, 'Content-Type': 'application/octet-stream' },
+    onProgress: ({ bytesSent, totalBytes }) => {
+      if (totalBytes > 0) onProgress?.(bytesSent / totalBytes);
+    },
   });
-  const response = await task.uploadAsync();
-  if (!response) throw new Error('Upload was interrupted.');
+  let response;
+  try {
+    response = await task.uploadAsync();
+  } finally {
+    task.release();
+  }
   let body: { item?: MediaItem; error?: string } = {};
   try { body = JSON.parse(response.body); } catch { /* An older server may return plain text. */ }
   if (response.status < 200 || response.status >= 300 || !body.item) {

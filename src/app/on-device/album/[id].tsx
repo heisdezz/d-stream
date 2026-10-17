@@ -32,6 +32,7 @@ export default function DeviceAlbumScreen() {
   const [showUpload, setShowUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState('');
+  const [uploadErrorMessage, setUploadErrorMessage] = useState('');
   const cursor = useRef<string | undefined>(undefined);
   const hasMore = useRef(true);
   const loadingPage = useRef(false);
@@ -71,6 +72,7 @@ export default function DeviceAlbumScreen() {
   const handleUpload = async (destinationAlbumId: number, deleteAfterUpload: boolean) => {
     if (uploading || !selectedAssets.length) return;
     setUploading(true);
+    setUploadErrorMessage('');
     let lastProgress = '';
     try {
       const result = await uploadDeviceSelection(
@@ -93,10 +95,10 @@ export default function DeviceAlbumScreen() {
         toast.success(`${result.uploaded} item${result.uploaded === 1 ? '' : 's'} uploaded.`);
       }
       if (result.deletionFailures) toast.info(`${result.deletionFailures} original${result.deletionFailures === 1 ? '' : 's'} remain on this device.`);
-      if (result.error) toast.error(catalogError(result.error));
+      if (result.error) setUploadErrorMessage(catalogError(result.error));
       if (!result.error) setShowUpload(false);
     } catch (uploadError) {
-      toast.error(catalogError(uploadError));
+      setUploadErrorMessage(catalogError(uploadError));
     } finally {
       setUploading(false);
       setProgress('');
@@ -137,6 +139,7 @@ export default function DeviceAlbumScreen() {
       connected={serverStatus === 'connected'}
       busy={uploading}
       progress={progress}
+      errorMessage={uploadErrorMessage}
       onClose={() => { if (!uploading) setShowUpload(false); }}
       onUpload={(albumId, deleteAfterUpload) => void handleUpload(albumId, deleteAfterUpload)}
     />
