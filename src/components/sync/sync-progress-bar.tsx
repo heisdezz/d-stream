@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { ActivityIndicator, View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { SyncProgress } from '@/types/models';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { Shapes, Spacing } from '@/constants/theme';
@@ -22,41 +22,50 @@ export const SyncProgressBar: React.FC<SyncProgressBarProps> = ({
   style,
 }) => {
   const { colors } = useMaterialTheme();
+  const isDownloading = progress.contentLength <= 0;
 
   return (
     <View style={[styles.container, style]}>
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: colors.onSurface }]}>
-          Downloading Database Snapshot
+          {isDownloading
+            ? 'Downloading database snapshot'
+            : 'Applying database snapshot'}
         </Text>
-        <Text style={[styles.percentage, { color: colors.primary }]}>
-          {progress.percentage}%
-        </Text>
+        {isDownloading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Text style={[styles.percentage, { color: colors.primary }]}>
+            {progress.percentage}%
+          </Text>
+        )}
       </View>
 
-      <View
-        style={[
-          styles.track,
-          { backgroundColor: colors.surfaceContainerHighest },
-        ]}
-      >
+      {!isDownloading && (
         <View
           style={[
-            styles.fill,
-            {
-              width: `${Math.max(4, Math.min(100, progress.percentage))}%`,
-              backgroundColor: colors.primary,
-            },
+            styles.track,
+            { backgroundColor: colors.surfaceContainerHighest },
           ]}
-        />
-      </View>
+        >
+          <View
+            style={[
+              styles.fill,
+              {
+                width: `${Math.max(4, Math.min(100, progress.percentage))}%`,
+                backgroundColor: colors.primary,
+              },
+            ]}
+          />
+        </View>
+      )}
 
       <View style={styles.footerRow}>
         <Text style={[styles.byteText, { color: colors.outline }]}>
           {formatBytes(progress.bytesWritten)}
           {progress.contentLength > 0
             ? ` / ${formatBytes(progress.contentLength)}`
-            : ''}
+            : ' downloaded'}
         </Text>
       </View>
     </View>

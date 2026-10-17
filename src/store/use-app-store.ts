@@ -265,7 +265,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       status: "downloading",
       errorMessage: null,
-      syncProgress: { bytesWritten: 0, contentLength: 1, percentage: 0 },
+      syncProgress: { bytesWritten: 0, contentLength: 0, percentage: 0 },
     });
 
     const { path: targetUri, dbName } = getNewSnapshotDownloadPath();

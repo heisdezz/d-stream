@@ -125,6 +125,8 @@ export async function downloadDatabaseSnapshot(
   const downloadUrl = `${baseUrl}/download/db`;
   const startedAt = Date.now();
   let firstByteLogged = false;
+  let lastReportedBytes = 0;
+  let progressTimer: ReturnType<typeof setInterval> | undefined;
 
   try {
     const dir = targetUri.substring(0, targetUri.lastIndexOf("/"));
@@ -139,28 +141,31 @@ export async function downloadDatabaseSnapshot(
       // Ignored
     }
 
-    const result = await File.downloadFileAsync(
-      downloadUrl,
-      new File(targetUri),
-      {
-        onProgress: (downloadProgress) => {
-          const bytesWritten = downloadProgress.bytesWritten;
-          const contentLength = downloadProgress.totalBytes;
-          if (!firstByteLogged && bytesWritten > 0) {
+    const outputFile = new File(targetUri);
+    if (onProgress) {
+      progressTimer = setInterval(() => {
+        try {
+          const bytesWritten = outputFile.size ?? 0;
+          if (bytesWritten <= lastReportedBytes) return;
+          lastReportedBytes = bytesWritten;
+          if (!firstByteLogged) {
             firstByteLogged = true;
             console.log(
               `[SyncAPI] Snapshot first bytes after ${Date.now() - startedAt} ms`,
             );
           }
-          const percentage =
-            contentLength > 0
-              ? Math.min(100, Math.round((bytesWritten / contentLength) * 100))
-              : 0;
+          onProgress({ bytesWritten, contentLength: 0, percentage: 0 });
+        } catch {
+          // The file may not exist until the server starts responding.
+        }
+      }, 250);
+    }
 
-          onProgress?.({ bytesWritten, contentLength, percentage });
-        },
-      },
-    );
+    const result = await File.downloadFileAsync(downloadUrl, outputFile);
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = undefined;
+    }
 
     const fileInfo = await FileSystem.getInfoAsync(result.uri);
     if (!fileInfo.exists || (fileInfo.size ?? 0) === 0) {
@@ -169,6 +174,12 @@ export async function downloadDatabaseSnapshot(
         error: "Downloaded database file is empty or missing.",
       };
     }
+
+    onProgress?.({
+      bytesWritten: fileInfo.size ?? 0,
+      contentLength: fileInfo.size ?? 0,
+      percentage: 100,
+    });
 
     console.log(
       `[SyncAPI] Snapshot download complete in ${Date.now() - startedAt} ms (${fileInfo.size ?? 0} bytes)`,
@@ -192,5 +203,7 @@ export async function downloadDatabaseSnapshot(
       success: false,
       error: error.message || "Failed to stream database from sync server.",
     };
+  } finally {
+    if (progressTimer) clearInterval(progressTimer);
   }
 }
