@@ -5,10 +5,10 @@ import type { DeviceMedia } from './device-media';
 import { getDeviceMediaUploadUri } from './device-media';
 import { getServerBaseUrl } from './sync-api';
 import { getSavedWriteKey } from './storage';
+import { validateWriteToken } from './write-token';
 
 async function writeHeaders(ip: string, port: number) {
-  const key = await getSavedWriteKey(ip, port);
-  if (!/^[a-f0-9]{64}$/i.test(key)) throw new Error('Enter the 64-character write token shown in the desktop Sync settings.');
+  const key = validateWriteToken(await getSavedWriteKey(ip, port));
   return { Authorization: `Bearer ${key}` };
 }
 

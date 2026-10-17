@@ -24,6 +24,7 @@ import {
   getSavedWriteKey,
   saveWriteKey,
 } from "@/services/storage";
+import { validateWriteToken } from "@/services/write-token";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Badge } from "@/components/material/m3-badge";
@@ -113,15 +114,12 @@ export default function SyncScreen() {
 
   const handleSaveWriteKey = async () => {
     const token = inputWriteKey.trim();
-    if (token && !/^[a-f0-9]{64}$/i.test(token)) {
-      toast.error('The desktop write token must be 64 hexadecimal characters.');
-      return;
-    }
     try {
+      if (token) validateWriteToken(token);
       await saveWriteKey(ip, port, token);
       toast.success(token ? 'Write token saved for this server.' : 'Write token removed.');
     } catch (error) {
-      toast.error('Could not save the write token.');
+      toast.error(error instanceof Error ? error.message : 'Could not save the write token.');
     }
   };
 
@@ -609,7 +607,7 @@ export default function SyncScreen() {
           <Text style={[tw`text-sm font-bold ml-2`, { color: colors.onSurface }]}>Library write token</Text>
         </View>
         <Text style={[tw`text-xs mb-3`, { color: colors.onSurfaceVariant }]}>
-          Copy the write token from Local Network Mobile Sync in the desktop Settings. It changes when that server restarts.
+          Copy the write token from Local Network Mobile Sync in the desktop Settings. It remains valid until you change it there.
         </Text>
         <TextInput
           value={inputWriteKey}
