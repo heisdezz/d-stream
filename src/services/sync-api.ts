@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { File } from "expo-file-system";
 import * as FileSystem from "expo-file-system/legacy";
 import { ServerInfo, SyncProgress } from "@/types/models";
 
@@ -122,6 +123,8 @@ export async function downloadDatabaseSnapshot(
 ): Promise<{ success: boolean; uri?: string; error?: string }> {
   const baseUrl = getServerBaseUrl(ip, port);
   const downloadUrl = `${baseUrl}/download/db`;
+  const startedAt = Date.now();
+  let firstByteLogged = false;
 
   try {
     const dir = targetUri.substring(0, targetUri.lastIndexOf("/"));
@@ -136,49 +139,28 @@ export async function downloadDatabaseSnapshot(
       // Ignored
     }
 
-    const downloadResumable = FileSystem.createDownloadResumable(
+    const result = await File.downloadFileAsync(
       downloadUrl,
-      targetUri,
-      {},
-      (downloadProgress) => {
-        const bytesWritten = downloadProgress.totalBytesWritten;
-        const contentLength = downloadProgress.totalBytesExpectedToWrite;
-        const percentage =
-          contentLength > 0
-            ? Math.min(100, Math.round((bytesWritten / contentLength) * 100))
-            : 0;
+      new File(targetUri),
+      {
+        onProgress: (downloadProgress) => {
+          const bytesWritten = downloadProgress.bytesWritten;
+          const contentLength = downloadProgress.totalBytes;
+          if (!firstByteLogged && bytesWritten > 0) {
+            firstByteLogged = true;
+            console.log(
+              `[SyncAPI] Snapshot first bytes after ${Date.now() - startedAt} ms`,
+            );
+          }
+          const percentage =
+            contentLength > 0
+              ? Math.min(100, Math.round((bytesWritten / contentLength) * 100))
+              : 0;
 
-        if (onProgress) {
-          onProgress({
-            bytesWritten,
-            contentLength,
-            percentage,
-          });
-        }
+          onProgress?.({ bytesWritten, contentLength, percentage });
+        },
       },
     );
-
-    const result = await downloadResumable.downloadAsync();
-    if (!result || !result.uri) {
-      return { success: false, error: "Database download returned no output." };
-    }
-
-    if (result.status !== 200) {
-      let serverError = `Server returned HTTP ${result.status}`;
-      try {
-        const content = await FileSystem.readAsStringAsync(result.uri);
-        const parsed = JSON.parse(content);
-        if (parsed.error) serverError = parsed.error;
-      } catch {
-        // Ignored
-      }
-      try {
-        await FileSystem.deleteAsync(result.uri, { idempotent: true });
-      } catch {
-        // Ignored
-      }
-      return { success: false, error: serverError };
-    }
 
     const fileInfo = await FileSystem.getInfoAsync(result.uri);
     if (!fileInfo.exists || (fileInfo.size ?? 0) === 0) {
@@ -187,6 +169,10 @@ export async function downloadDatabaseSnapshot(
         error: "Downloaded database file is empty or missing.",
       };
     }
+
+    console.log(
+      `[SyncAPI] Snapshot download complete in ${Date.now() - startedAt} ms (${fileInfo.size ?? 0} bytes)`,
+    );
 
     return { success: true, uri: result.uri };
   } catch (error: any) {

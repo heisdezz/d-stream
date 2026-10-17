@@ -260,6 +260,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncDatabase: async (targetIp?: string, targetPort?: number) => {
     const currentIp = targetIp ?? get().ip;
     const currentPort = targetPort ?? get().port;
+    const startedAt = Date.now();
 
     set({
       status: "downloading",
@@ -268,12 +269,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     const { path: targetUri, dbName } = getNewSnapshotDownloadPath();
+    let lastProgressAt = 0;
     const downloadRes = await downloadDatabaseSnapshot(
       currentIp,
       currentPort,
       targetUri,
       (progress) => {
-        set({ syncProgress: progress });
+        const now = Date.now();
+        if (progress.percentage === 100 || now - lastProgressAt >= 200) {
+          lastProgressAt = now;
+          set({ syncProgress: progress });
+        }
       },
     );
 
@@ -290,8 +296,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }
 
+    const downloadMs = Date.now() - startedAt;
     set({ status: "migrating" });
+    const importStartedAt = Date.now();
     const importSuccess = await importDownloadedSnapshot(dbName);
+    const importMs = Date.now() - importStartedAt;
 
     if (!importSuccess) {
       set({
@@ -309,7 +318,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     await setLastSyncTime(now);
 
     // Refresh store library data
+    const refreshStartedAt = Date.now();
     await get().refreshLibrary();
+    console.log(
+      `[AppStore] Snapshot sync timings: download=${downloadMs} ms, import=${importMs} ms, refresh=${Date.now() - refreshStartedAt} ms, total=${Date.now() - startedAt} ms`,
+    );
 
     set({
       status: "connected",
