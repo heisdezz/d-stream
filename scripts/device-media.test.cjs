@@ -42,3 +42,19 @@ test('available native library loads one bounded gallery page', async () => {
   assert.equal(query.first, 36);
   assert.deepEqual(Array.from(query.mediaType), ['photo', 'video']);
 });
+
+test('device albums come from the native album query and filter album pages', async () => {
+  let query;
+  const media = load({}, {
+    getAlbumsAsync: async () => [
+      { id: '2', title: 'Trips', assetCount: 3 },
+      { id: '1', title: 'Camera', assetCount: 5 },
+    ],
+    getAssetsAsync: async (options) => { query = options; return { assets: [] }; },
+  });
+  assert.deepEqual((await media.getDeviceAlbums()).map((album) => album.title), ['Camera', 'Trips']);
+  await media.getDeviceMediaPage(undefined, '1');
+  assert.equal(query.album, '1');
+  await media.getDeviceMediaPage(undefined, '__all__');
+  assert.equal(query.album, undefined);
+});

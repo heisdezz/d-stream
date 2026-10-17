@@ -84,6 +84,14 @@ export default function RootLayout() {
               options={{ headerShown: true, title: 'On this device', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface } }}
             />
             <Stack.Screen
+              name="on-device/album/[id]"
+              options={{ headerShown: true, title: 'Device album', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="on-device/media/[id]"
+              options={{ headerShown: true, title: 'Device media', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
               name="album/[id]"
               options={{
                 headerShown: true,

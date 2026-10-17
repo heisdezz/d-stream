@@ -17,6 +17,12 @@ function requireMediaLibrary(): typeof import('expo-media-library/legacy') {
 }
 
 export type DeviceMedia = MediaLibrary.Asset;
+export type DeviceAlbum = Pick<MediaLibrary.Album, 'id' | 'title' | 'assetCount'>;
+
+export async function getDeviceAlbums(): Promise<DeviceAlbum[]> {
+  const albums = await requireMediaLibrary().getAlbumsAsync({ includeSmartAlbums: true });
+  return albums.sort((a, b) => a.title.localeCompare(b.title));
+}
 
 export async function requestDeviceMediaAccess(): Promise<boolean> {
   const library = requireMediaLibrary();
@@ -26,13 +32,22 @@ export async function requestDeviceMediaAccess(): Promise<boolean> {
   return requested.granted || requested.accessPrivileges === 'limited';
 }
 
-export async function getDeviceMediaPage(after?: string) {
+export async function getDeviceMediaPage(after?: string, albumId?: string) {
   return requireMediaLibrary().getAssetsAsync({
     first: 36,
     ...(after ? { after } : {}),
+    ...(albumId && albumId !== '__all__' ? { album: albumId } : {}),
     mediaType: ['photo', 'video'],
     sortBy: [['creationTime', false]],
   });
+}
+
+export async function getDeviceMediaById(id: string): Promise<MediaLibrary.AssetInfo> {
+  return requireMediaLibrary().getAssetInfoAsync(id, { shouldDownloadFromNetwork: false });
+}
+
+export async function deleteDeviceMedia(id: string): Promise<boolean> {
+  return requireMediaLibrary().deleteAssetsAsync(id);
 }
 
 export async function getDeviceMediaFileUri(asset: DeviceMedia): Promise<string> {
