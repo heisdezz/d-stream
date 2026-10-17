@@ -1,14 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, useImage } from 'expo-image';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import { useAppStore } from '@/store/use-app-store';
-import { DeviceMedia, getDeviceMediaPage, requestDeviceMediaAccess } from '@/services/device-media';
+import { DeviceMedia, getDeviceMediaPage, isDeviceMediaAvailable, requestDeviceMediaAccess } from '@/services/device-media';
 import { catalogError, uploadDeviceMedia } from '@/services/catalog-api';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
+
+function PhotoPreview({ asset }: { asset: DeviceMedia }) {
+  const preview = useImage(asset.uri, { maxWidth: 256, maxHeight: 256, onError: () => {} });
+  return preview
+    ? <Image source={preview} recyclingKey={asset.id} style={StyleSheet.absoluteFill} contentFit="cover" />
+    : <MaterialIcons name="image" size={32} color="#888" />;
+}
 
 export default function OnDeviceScreen() {
   const { colors } = useMaterialTheme();
@@ -30,6 +38,8 @@ export default function OnDeviceScreen() {
   const cursor = useRef<string | undefined>(undefined);
   const hasMore = useRef(true);
   const loadingPage = useRef(false);
+  const requiresBuild = !isDeviceMediaAvailable() ||
+    (Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient);
   const selectedAssets = assets.filter((asset) => selected[asset.id]);
   const chosenAlbum = albums.find((album) => album.id === albumId);
   const tileWidth = (Math.min(width, MaxContentWidth + Spacing.four * 2) - Spacing.four * 2 - Spacing.one * 2) / 3;
@@ -59,7 +69,7 @@ export default function OnDeviceScreen() {
     }
   }, []);
 
-  useEffect(() => { void loadPage(true); }, [loadPage]);
+  useEffect(() => { if (!requiresBuild) void loadPage(true); }, [loadPage, requiresBuild]);
 
   const handleUpload = async () => {
     if (uploading || selectedAssets.length === 0) return;
@@ -120,7 +130,12 @@ export default function OnDeviceScreen() {
         </Pressable>
       </View>
 
-      {loading && assets.length === 0 ? (
+      {requiresBuild ? (
+        <View style={styles.center}>
+          <MaterialIcons name="system-update" size={40} color={colors.primary} />
+          <Text style={[styles.message, { color: colors.onSurface }]}>Install the latest app build to browse and upload device media.</Text>
+        </View>
+      ) : loading && assets.length === 0 ? (
         <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>
       ) : permissionDenied ? (
         <View style={styles.center}>
@@ -140,7 +155,10 @@ export default function OnDeviceScreen() {
           contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 104 }]}
           columnWrapperStyle={{ gap: Spacing.one }}
           onEndReached={() => void loadPage(false)}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={0.25}
+          initialNumToRender={9}
+          maxToRenderPerBatch={6}
+          windowSize={3}
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="checkbox"
@@ -149,7 +167,7 @@ export default function OnDeviceScreen() {
               onPress={() => setSelected((previous) => ({ ...previous, [item.id]: !previous[item.id] }))}
               style={[styles.tile, { width: tileWidth, height: tileWidth, backgroundColor: colors.surfaceContainer }]}
             >
-              <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              {item.mediaType === 'photo' ? <PhotoPreview asset={item} /> : <MaterialIcons name="play-circle-outline" size={40} color={colors.onSurfaceVariant} />}
               {item.mediaType === 'video' && <MaterialIcons name="videocam" size={20} color="white" style={styles.videoIcon} />}
               <View style={[styles.check, { backgroundColor: selected[item.id] ? colors.primary : '#0009' }]}>
                 <MaterialIcons name={selected[item.id] ? 'check' : 'add'} size={17} color="white" />
@@ -216,7 +234,7 @@ const styles = StyleSheet.create({
   message: { fontSize: 15, textAlign: 'center', marginTop: Spacing.two },
   retry: { minHeight: 48, justifyContent: 'center', paddingHorizontal: Spacing.four },
   grid: { padding: Spacing.four, gap: Spacing.one, maxWidth: MaxContentWidth + Spacing.four * 2, alignSelf: 'center' },
-  tile: { borderRadius: 10, overflow: 'hidden' },
+  tile: { borderRadius: 10, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   videoIcon: { position: 'absolute', left: 8, bottom: 8, textShadowColor: '#000', textShadowRadius: 4 },
   check: { position: 'absolute', right: 7, top: 7, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, minHeight: 72, paddingHorizontal: Spacing.four, paddingTop: Spacing.two, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
