@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useDebounce } from "@/hooks/use-debounce";
 import {
   View,
   Text,
@@ -32,7 +31,6 @@ import {
   M3SegmentedRow,
   SegmentItem,
 } from "@/components/material/m3-segmented-row";
-import { M3Chip } from "@/components/material/m3-chip";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Card } from "@/components/material/m3-card";
 import { MediaGridItem } from "@/components/media/media-grid-item";
@@ -240,72 +238,32 @@ export default function MediaExplorerScreen() {
         style={{ marginTop: Spacing.two }}
       />
 
-      {/* Album & Tag Quick Chips Row */}
-      {(albums.length > 0 || tags.length > 0) && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalChipsScroll}
-          style={{ marginTop: Spacing.two }}
-        >
-          {/* Clear Filters Chip */}
-          {(selectedAlbumId !== undefined || selectedTagId !== undefined) && (
-            <M3Chip
-              label="Clear Filter"
-              icon="clear"
-              selected
-              onPress={() => {
-                setSelectedAlbumId(undefined);
-                setSelectedTagId(undefined);
-                setCurrentPage(1);
-              }}
-              style={{ marginRight: Spacing.one }}
-            />
-          )}
-
-          {/* Active Album Chip */}
-          {activeAlbum && (
-            <M3Chip
-              label={`Album: ${activeAlbum.name}`}
-              icon="folder"
-              selected
-              onPress={() => {
-                setSelectedAlbumId(undefined);
-                setCurrentPage(1);
-              }}
-              style={{ marginRight: Spacing.one }}
-            />
-          )}
-
-          {/* Active Tag Chip */}
-          {activeTag && (
-            <M3Chip
-              label={`Tag: ${activeTag.name}`}
-              colorHex={activeTag.color_hex}
-              selected
-              onPress={() => {
-                setSelectedTagId(undefined);
-                setCurrentPage(1);
-              }}
-              style={{ marginRight: Spacing.one }}
-            />
-          )}
-
-          {/* Quick Album Selector Chips */}
-          {selectedAlbumId === undefined &&
-            albums.slice(0, 8).map((alb) => (
-              <M3Chip
-                key={alb.id}
-                label={`${alb.name} (${alb.media_count})`}
-                icon="folder"
-                onPress={() => {
-                  setSelectedAlbumId(alb.id);
-                  setCurrentPage(1);
-                }}
-                style={{ marginRight: Spacing.one }}
-              />
-            ))}
-        </ScrollView>
+      {/* Keep selected collection filters visible without repeating the collection browser. */}
+      {(selectedAlbumId !== undefined || selectedTagId !== undefined) && (
+        <View style={[styles.activeFilterRow, { backgroundColor: colors.secondaryContainer }]}>
+          <MaterialIcons name="filter-list" size={18} color={colors.onSecondaryContainer} />
+          <Text
+            numberOfLines={1}
+            style={[styles.activeFilterLabel, { color: colors.onSecondaryContainer }]}
+          >
+            {[
+              selectedAlbumId !== undefined && `Album: ${activeAlbum?.name || selectedAlbumId}`,
+              selectedTagId !== undefined && `Tag: ${activeTag?.name || selectedTagId}`,
+            ].filter(Boolean).join(" · ")}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Clear collection filters"
+            onPress={() => {
+              setSelectedAlbumId(undefined);
+              setSelectedTagId(undefined);
+              setCurrentPage(1);
+            }}
+            style={styles.clearFilterButton}
+          >
+            <MaterialIcons name="close" size={20} color={colors.onSecondaryContainer} />
+          </Pressable>
+        </View>
       )}
 
       {/* Metrics Bar & Sort Controls */}
@@ -479,10 +437,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  horizontalChipsScroll: {
+  activeFilterRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
+    minHeight: 48,
+    paddingLeft: Spacing.three,
+    borderRadius: Shapes.medium,
+    marginTop: Spacing.two,
+  },
+  activeFilterLabel: {
+    flex: 1,
+    marginLeft: Spacing.one,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  clearFilterButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   metricsBar: {
     flexDirection: "row",

@@ -14,7 +14,7 @@ import { useSetAtom } from "jotai";
 import { useMaterialTheme } from "@/hooks/use-material-theme";
 import { useAppStore } from "@/store/use-app-store";
 import { mediaTypeFilterAtom, searchQueryAtom } from "@/store/atoms";
-import { Spacing, Shapes, MaxContentWidth } from "@/constants/theme";
+import { Spacing, MaxContentWidth } from "@/constants/theme";
 import { M3Button } from "@/components/material/m3-button";
 import { M3Card } from "@/components/material/m3-card";
 import { M3Badge } from "@/components/material/m3-badge";
@@ -261,9 +261,12 @@ export default function HomeScreen() {
         <View style={tw`flex-row gap-2 mb-4`}>
           <Pressable
             onPress={() => handleCategoryPress("image")}
+            accessibilityRole="button"
+            accessibilityLabel={`${stats.images.toLocaleString()} photos`}
             style={({ pressed }) => [
               tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
+                minHeight: 48,
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
                 opacity: pressed ? 0.8 : 1,
@@ -271,16 +274,24 @@ export default function HomeScreen() {
             ]}
           >
             <MaterialIcons name="image" size={18} color={colors.primary} />
-            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
-              {stats.images.toLocaleString()} Photos
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[tw`text-sm font-bold`, { color: colors.onSurface, flexShrink: 1 }]}
+            >
+              {stats.images.toLocaleString()}
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => handleCategoryPress("video")}
+            accessibilityRole="button"
+            accessibilityLabel={`${stats.videos.toLocaleString()} videos`}
             style={({ pressed }) => [
               tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
+                minHeight: 48,
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
                 opacity: pressed ? 0.8 : 1,
@@ -288,16 +299,24 @@ export default function HomeScreen() {
             ]}
           >
             <MaterialIcons name="videocam" size={18} color={colors.tertiary} />
-            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
-              {stats.videos.toLocaleString()} Videos
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[tw`text-sm font-bold`, { color: colors.onSurface, flexShrink: 1 }]}
+            >
+              {stats.videos.toLocaleString()}
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => router.push("/albums")}
+            accessibilityRole="button"
+            accessibilityLabel={`${stats.albums.toLocaleString()} albums`}
             style={({ pressed }) => [
               tw`flex-1 flex-row items-center justify-center gap-1.5 py-2 px-1 rounded-xl border`,
               {
+                minHeight: 48,
                 backgroundColor: colors.surfaceContainer,
                 borderColor: colors.outlineVariant,
                 opacity: pressed ? 0.8 : 1,
@@ -309,8 +328,13 @@ export default function HomeScreen() {
               size={18}
               color={colors.secondary}
             />
-            <Text style={[tw`text-xs font-bold`, { color: colors.onSurface }]}>
-              {stats.albums.toLocaleString()} Albums
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+              style={[tw`text-sm font-bold`, { color: colors.onSurface, flexShrink: 1 }]}
+            >
+              {stats.albums.toLocaleString()}
             </Text>
           </Pressable>
         </View>
