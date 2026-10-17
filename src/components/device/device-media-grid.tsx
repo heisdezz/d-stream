@@ -1,10 +1,12 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image, useImage } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
+import type { VideoThumbnail } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMaterialTheme } from '@/hooks/use-material-theme';
 import type { DeviceMedia } from '@/services/device-media';
+import { getDeviceVideoThumbnail } from '@/services/device-video-thumbnail';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 
 const PhotoPreview = memo(function PhotoPreview({ asset }: { asset: DeviceMedia }) {
@@ -12,6 +14,34 @@ const PhotoPreview = memo(function PhotoPreview({ asset }: { asset: DeviceMedia 
   return preview
     ? <Image source={preview} recyclingKey={asset.id} style={StyleSheet.absoluteFill} contentFit="cover" />
     : <MaterialIcons name="image" size={32} color="#888" />;
+});
+
+const VideoPreview = memo(function VideoPreview({ asset }: { asset: DeviceMedia }) {
+  const [thumbnail, setThumbnail] = useState<VideoThumbnail | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let frame: VideoThumbnail | null = null;
+    setThumbnail(null);
+    void getDeviceVideoThumbnail(asset.uri, controller.signal).then((result) => {
+      if (controller.signal.aborted) {
+        result.release();
+        return;
+      }
+      frame = result;
+      setThumbnail(result);
+    }).catch(() => {
+      // A missing or unsupported video keeps its play icon.
+    });
+    return () => {
+      controller.abort();
+      frame?.release();
+    };
+  }, [asset.uri]);
+
+  return thumbnail
+    ? <Image source={thumbnail} recyclingKey={asset.id} style={StyleSheet.absoluteFill} contentFit="cover" />
+    : <MaterialIcons name="play-circle-outline" size={40} color="#888" />;
 });
 
 interface Props {
@@ -50,8 +80,8 @@ export function DeviceMediaGrid({ assets, selected, onOpen, onSelect, onLoadMore
     >
       {item.mediaType === 'photo'
         ? <PhotoPreview asset={item} />
-        : <MaterialIcons name="play-circle-outline" size={40} color={colors.onSurfaceVariant} />}
-      {item.mediaType === 'video' && <MaterialIcons name="videocam" size={20} color={colors.onSurfaceVariant} style={styles.videoIcon} />}
+        : <VideoPreview asset={item} />}
+      {item.mediaType === 'video' && <MaterialIcons name="play-circle-filled" size={26} color="white" style={styles.videoIcon} />}
       {selected[item.id] && <View pointerEvents="none" style={[styles.selectedBorder, { borderColor: colors.primary }]} />}
       {selecting && <View style={[styles.check, { backgroundColor: selected[item.id] ? colors.primary : '#0009' }]}>
         <MaterialIcons name={selected[item.id] ? 'check' : 'add'} size={17} color="white" />
